@@ -1,0 +1,1 @@
+export const ORM_ADAPTER_TOKEN = 'ORM_ADAPTER';

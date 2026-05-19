@@ -1,0 +1,200 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider     = "prisma-client-js"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  phone        String?
+  role         String   @default("customer") // customer, provider, admin
+  avatarUrl    String?  @map("avatar_url")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  providerProfile          ProviderProfile?
+  customerJobs             Job[]              @relation("CustomerJobs")
+  assignedJobs             Job[]              @relation("AssignedJobs")
+  providerServices         ProviderService[]
+  bids                     JobBid[]
+  jobAssignmentsAsCustomer JobAssignment[]    @relation("CustomerAssignments")
+  jobAssignmentsAsProvider JobAssignment[]    @relation("ProviderAssignments")
+  customerConversations    Conversation[]     @relation("CustomerConversations")
+  providerConversations    Conversation[]     @relation("ProviderConversations")
+  sentMessages             Message[]          @relation("SentMessages")
+  jobStatusHistories       JobStatusHistory[]
+
+  @@map("users")
+}
+
+model ProviderProfile {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @unique @map("user_id") @db.Uuid
+  businessName    String?  @map("business_name")
+  bio             String?
+  yearsExperience Int?     @map("years_experience")
+  serviceAreaText String?  @map("service_area_text")
+  suburb          String?
+  state           String?
+  isVerified      Boolean  @default(false) @map("is_verified")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("provider_profiles")
+}
+
+model ServiceCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  slug      String   @unique
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  providerServices ProviderService[]
+  jobs             Job[]
+
+  @@map("service_categories")
+}
+
+model ProviderService {
+  id         String   @id @default(uuid()) @db.Uuid
+  providerId String   @map("provider_id") @db.Uuid
+  categoryId String   @map("category_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  provider User            @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  category ServiceCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, categoryId])
+  @@map("provider_services")
+}
+
+model Job {
+  id                 String    @id @default(uuid()) @db.Uuid
+  customerId         String    @map("customer_id") @db.Uuid
+  categoryId         String    @map("category_id") @db.Uuid
+  title              String
+  description        String
+  locationText       String    @map("location_text")
+  suburb             String?
+  state              String?
+  latitude           Float?
+  longitude          Float?
+  preferredDate      DateTime? @map("preferred_date")
+  status             String    @default("open") // open, assigned, completed, cancelled
+  assignedProviderId String?   @map("assigned_provider_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  customer         User               @relation("CustomerJobs", fields: [customerId], references: [id], onDelete: Cascade)
+  assignedProvider User?              @relation("AssignedJobs", fields: [assignedProviderId], references: [id], onDelete: SetNull)
+  category         ServiceCategory    @relation(fields: [categoryId], references: [id])
+  bids             JobBid[]
+  assignment       JobAssignment?
+  conversation     Conversation?
+  statusHistory    JobStatusHistory[]
+
+  @@map("jobs")
+}
+
+model JobBid {
+  id                    String   @id @default(uuid()) @db.Uuid
+  jobId                 String   @map("job_id") @db.Uuid
+  providerId            String   @map("provider_id") @db.Uuid
+  bidAmount             Float?   @map("bid_amount")
+  message               String?
+  estimatedArrivalHours Int?     @map("estimated_arrival_hours")
+  status                String   @default("pending") // pending, accepted, rejected, withdrawn
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  job                Job            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  provider           User           @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  acceptedAssignment JobAssignment?
+
+  @@unique([jobId, providerId])
+  @@map("job_bids")
+}
+
+model JobAssignment {
+  id            String    @id @default(uuid()) @db.Uuid
+  jobId         String    @unique @map("job_id") @db.Uuid
+  customerId    String    @map("customer_id") @db.Uuid
+  providerId    String    @map("provider_id") @db.Uuid
+  acceptedBidId String?   @unique @map("accepted_bid_id") @db.Uuid
+  assignedAt    DateTime  @default(now()) @map("assigned_at")
+  completedAt   DateTime? @map("completed_at")
+
+  // Relations
+  job         Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  customer    User    @relation("CustomerAssignments", fields: [customerId], references: [id], onDelete: Cascade)
+  provider    User    @relation("ProviderAssignments", fields: [providerId], references: [id], onDelete: Cascade)
+  acceptedBid JobBid? @relation(fields: [acceptedBidId], references: [id], onDelete: SetNull)
+
+  @@map("job_assignments")
+}
+
+model Conversation {
+  id         String   @id @default(uuid()) @db.Uuid
+  jobId      String   @unique @map("job_id") @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  providerId String   @map("provider_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  job      Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  customer User      @relation("CustomerConversations", fields: [customerId], references: [id], onDelete: Cascade)
+  provider User      @relation("ProviderConversations", fields: [providerId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  senderId       String   @map("sender_id") @db.Uuid
+  messageText    String   @map("message_text")
+  isRead         Boolean  @default(false) @map("is_read")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model JobStatusHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  jobId     String   @map("job_id") @db.Uuid
+  oldStatus String?  @map("old_status")
+  newStatus String   @map("new_status")
+  changedBy String?  @map("changed_by") @db.Uuid
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  job           Job   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  changedByUser User? @relation(fields: [changedBy], references: [id], onDelete: SetNull)
+
+  @@map("job_status_history")
+}
