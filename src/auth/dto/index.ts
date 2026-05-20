@@ -1,5 +1,3 @@
-// Barrel re-exports — split files live alongside.
-// Preserves the original `./dto/auth.dto` import path.
 export * from './register.dto';
 export * from './login.dto';
 export * from './refresh-token.dto';

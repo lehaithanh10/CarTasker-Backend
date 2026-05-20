@@ -1,5 +1,3 @@
-// Barrel re-exports — split files live alongside.
-// Preserves the original `./dto/provider.dto` import path.
 export * from './create-provider-profile.dto';
 export * from './update-provider-profile.dto';
 export * from './update-provider-services.dto';

@@ -1,48 +1,31 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@/prisma/prisma.service';
+import { JobRepository } from '@/repositories/job.repository';
+import { BidRepository } from '@/repositories/bid.repository';
 import { CustomerDashboardDto, ProviderDashboardDto } from './dto/dashboard.dto';
 import { JobStatus, BidStatus } from '@/common/enums';
+import { BidMapper } from '@/bids/mappers/bid.mapper';
+
+const RECENT_ITEMS_LIMIT = 5;
 
 @Injectable()
 export class DashboardService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private jobRepository: JobRepository,
+    private bidRepository: BidRepository,
+  ) {}
 
   async getCustomerDashboard(customerId: string): Promise<CustomerDashboardDto> {
-    const openJobsCount = await this.prisma.job.count({
-      where: {
-        customerId,
-        status: JobStatus.OPEN,
-      },
-    });
-
-    const assignedJobsCount = await this.prisma.job.count({
-      where: {
-        customerId,
-        status: JobStatus.ASSIGNED,
-      },
-    });
-
-    const completedJobsCount = await this.prisma.job.count({
-      where: {
-        customerId,
-        status: JobStatus.COMPLETED,
-      },
-    });
-
-    const openJobs = await this.prisma.job.findMany({
-      where: {
-        customerId,
-        status: JobStatus.OPEN,
-      },
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    });
+    const [openJobsCount, assignedJobsCount, completedJobsCount, openJobs] =
+      await Promise.all([
+        this.jobRepository.countByCustomerAndStatus(customerId, JobStatus.OPEN),
+        this.jobRepository.countByCustomerAndStatus(customerId, JobStatus.ASSIGNED),
+        this.jobRepository.countByCustomerAndStatus(customerId, JobStatus.COMPLETED),
+        this.jobRepository.findRecentByCustomerAndStatus(
+          customerId,
+          JobStatus.OPEN,
+          RECENT_ITEMS_LIMIT,
+        ),
+      ]);
 
     return {
       openJobsCount,
@@ -53,56 +36,26 @@ export class DashboardService {
   }
 
   async getProviderDashboard(providerId: string): Promise<ProviderDashboardDto> {
-    const availableJobsCount = await this.prisma.job.count({
-      where: {
-        status: JobStatus.OPEN,
-      },
-    });
-
-    const pendingBidsCount = await this.prisma.jobBid.count({
-      where: {
-        providerId,
-        status: BidStatus.PENDING,
-      },
-    });
-
-    const assignedJobsCount = await this.prisma.jobAssignment.count({
-      where: {
-        providerId,
-      },
-    });
-
-    const completedJobsCount = await this.prisma.job.count({
-      where: {
-        assignedProviderId: providerId,
-        status: JobStatus.COMPLETED,
-      },
-    });
-
-    const recentBids = await this.prisma.jobBid.findMany({
-      where: {
-        providerId,
-      },
-      include: {
-        job: {
-          select: { title: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    });
+    const [
+      availableJobsCount,
+      pendingBidsCount,
+      assignedJobsCount,
+      completedJobsCount,
+      recentBids,
+    ] = await Promise.all([
+      this.jobRepository.countByStatus(JobStatus.OPEN),
+      this.bidRepository.countByProviderAndStatus(providerId, BidStatus.PENDING),
+      this.jobRepository.countAssignmentsByProvider(providerId),
+      this.jobRepository.countByAssignedProviderAndStatus(providerId, JobStatus.COMPLETED),
+      this.bidRepository.findRecentByProvider(providerId, RECENT_ITEMS_LIMIT),
+    ]);
 
     return {
       availableJobsCount,
       pendingBidsCount,
       assignedJobsCount,
       completedJobsCount,
-      recentBids: recentBids.map((bid: any) => ({
-        id: bid.id,
-        jobTitle: bid.job.title,
-        status: bid.status,
-        createdAt: bid.createdAt,
-      })),
+      recentBids: BidMapper.toDashboardItems(recentBids),
     };
   }
 }

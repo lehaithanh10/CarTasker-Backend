@@ -1,18 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
+import { ConfigService } from '@nestjs/config';
 import { UserRepository, User } from '@/repositories/user.repository';
 import { RegisterDto, LoginDto, AuthResponseDto } from './dto/auth.dto';
 import {
   UserAlreadyExistsException,
   InvalidCredentialsException,
 } from '@/common/exceptions';
+import { PasswordService } from '@/common/services/password.service';
+import { UserMapper } from '@/users/mappers/user.mapper';
+
+const DEFAULT_ACCESS_TOKEN_TTL = '24h';
+const DEFAULT_REFRESH_TOKEN_TTL = '7d';
 
 @Injectable()
 export class AuthService {
   constructor(
     private userRepository: UserRepository,
     private jwtService: JwtService,
+    private passwordService: PasswordService,
+    private configService: ConfigService,
   ) {}
 
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
@@ -22,7 +29,7 @@ export class AuthService {
       throw new UserAlreadyExistsException();
     }
 
-    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+    const hashedPassword = await this.passwordService.hash(registerDto.password);
 
     const user = await this.userRepository.create({
       email: registerDto.email,
@@ -32,51 +39,17 @@ export class AuthService {
       role: registerDto.role,
     });
 
-    const accessToken = this.generateAccessToken(user);
-    const refreshToken = this.generateRefreshToken(user);
-
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        phone: user.phone,
-        role: user.role,
-        avatarUrl: user.avatarUrl,
-        isActive: user.isActive,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      },
-    };
+    return this.buildAuthResponse(user);
   }
 
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
     const user = await this.userRepository.findByEmail(loginDto.email);
 
-    if (!user || !(await bcrypt.compare(loginDto.password, user.passwordHash))) {
+    if (!user || !(await this.passwordService.verify(loginDto.password, user.passwordHash))) {
       throw new InvalidCredentialsException();
     }
 
-    const accessToken = this.generateAccessToken(user);
-    const refreshToken = this.generateRefreshToken(user);
-
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        phone: user.phone,
-        role: user.role,
-        avatarUrl: user.avatarUrl,
-        isActive: user.isActive,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      },
-    };
+    return this.buildAuthResponse(user);
   }
 
   async refreshToken(refreshToken: string): Promise<AuthResponseDto> {
@@ -91,25 +64,8 @@ export class AuthService {
         throw new InvalidCredentialsException();
       }
 
-      const newAccessToken = this.generateAccessToken(user);
-      const newRefreshToken = this.generateRefreshToken(user);
-
-      return {
-        accessToken: newAccessToken,
-        refreshToken: newRefreshToken,
-        user: {
-          id: user.id,
-          email: user.email,
-          fullName: user.fullName,
-          phone: user.phone,
-          role: user.role,
-          avatarUrl: user.avatarUrl,
-          isActive: user.isActive,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
-        },
-      };
-    } catch (error) {
+      return this.buildAuthResponse(user);
+    } catch {
       throw new InvalidCredentialsException();
     }
   }
@@ -118,29 +74,28 @@ export class AuthService {
     return this.userRepository.findByIdWithSelect(userId);
   }
 
+  private buildAuthResponse(user: User): AuthResponseDto {
+    const accessToken = this.generateAccessToken(user);
+    const refreshToken = this.generateRefreshToken(user);
+    return UserMapper.toAuthResponse(user, accessToken, refreshToken);
+  }
+
   private generateAccessToken(user: User): string {
-    return this.jwtService.sign(
-      {
-        email: user.email,
-        role: user.role,
-      },
-      {
-        subject: user.id,
-        expiresIn: '24h',
-      },
-    );
+    return this.signToken(user, this.getTtl('AUTH_ACCESS_TOKEN_TTL', DEFAULT_ACCESS_TOKEN_TTL));
   }
 
   private generateRefreshToken(user: User): string {
+    return this.signToken(user, this.getTtl('AUTH_REFRESH_TOKEN_TTL', DEFAULT_REFRESH_TOKEN_TTL));
+  }
+
+  private signToken(user: User, expiresIn: string): string {
     return this.jwtService.sign(
-      {
-        email: user.email,
-        role: user.role,
-      },
-      {
-        subject: user.id,
-        expiresIn: '7d',
-      },
+      { email: user.email, role: user.role },
+      { subject: user.id, expiresIn } as any,
     );
+  }
+
+  private getTtl(key: string, fallback: string): string {
+    return this.configService.get<string>(key) ?? fallback;
   }
 }

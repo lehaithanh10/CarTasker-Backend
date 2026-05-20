@@ -1,5 +1,3 @@
-// Barrel re-exports — split files live alongside.
-// Preserves the original `./dto/bid.dto` import path.
 export * from './create-job-bid.dto';
 export * from './update-job-bid.dto';
 export * from './accept-bid.dto';

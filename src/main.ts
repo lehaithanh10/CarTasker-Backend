@@ -3,12 +3,20 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { LoggingInterceptor } from './common/interceptors';
 
+function parseCorsOrigins(raw?: string): string[] | '*' {
+  if (!raw || raw.trim() === '*') return '*';
+  return raw
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Enable CORS
+  // CORS — comma-separated whitelist from CORS_ORIGINS env var, or '*' for dev only.
   app.enableCors({
-    origin: '*',
+    origin: parseCorsOrigins(process.env.CORS_ORIGINS),
     credentials: true,
   });
 

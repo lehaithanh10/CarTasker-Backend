@@ -6,9 +6,24 @@ import { CreateJobDto, UpdateJobDto } from './dto/job.dto';
 import {
   ResourceNotFoundException,
   UnauthorizedActionException,
-  InvalidJobStatusException,
 } from '@/common/exceptions';
-import { JobStatus } from '@/common/enums';
+import { JobStatus, UserRole } from '@/common/enums';
+import {
+  PaginationHelper,
+  AuthorizationHelper,
+  StatusValidator,
+  DateHelper,
+} from '@/common/helpers';
+
+interface JobListFilters {
+  status?: string;
+  title?: string;
+  categoryId?: string;
+  suburb?: string;
+  state?: string;
+  page?: number;
+  pageSize?: number;
+}
 
 @Injectable()
 export class JobsService {
@@ -19,15 +34,12 @@ export class JobsService {
   ) {}
 
   async createJob(customerId: string, createJobDto: CreateJobDto) {
-    const category = await this.categoryRepository.findUnique({
-      id: createJobDto.categoryId,
-    });
+    await this.categoryRepository.findByIdOrThrow(
+      createJobDto.categoryId,
+      'Service category',
+    );
 
-    if (!category) {
-      throw new ResourceNotFoundException('Service category');
-    }
-
-    const job = await this.jobRepository.create({
+    return this.jobRepository.create({
       customerId,
       categoryId: createJobDto.categoryId,
       title: createJobDto.title,
@@ -35,13 +47,9 @@ export class JobsService {
       locationText: createJobDto.locationText,
       suburb: createJobDto.suburb || null,
       state: createJobDto.state || null,
-      preferredDate: createJobDto.preferredDate
-        ? new Date(createJobDto.preferredDate)
-        : null,
+      preferredDate: DateHelper.parseOrNull(createJobDto.preferredDate),
       status: JobStatus.OPEN,
     });
-
-    return job;
   }
 
   async getJobById(jobId: string, currentUserId?: string, currentUserRole?: string) {
@@ -70,8 +78,7 @@ export class JobsService {
       bidsCount,
     };
 
-    // Enrich with provider-specific bid info
-    if (currentUserRole === 'provider' && currentUserId) {
+    if (currentUserRole === UserRole.PROVIDER && currentUserId) {
       const [otherBidsCount, lowestBidAmount, myBid] = await Promise.all([
         this.bidRepository.countPendingByJobExcludingProvider(jobId, currentUserId),
         this.bidRepository.findLowestPendingByJobExcludingProvider(jobId, currentUserId),
@@ -86,119 +93,70 @@ export class JobsService {
     return response;
   }
 
-  async listJobs(
-    filters: {
-      status?: string;
-      title?: string;
-      categoryId?: string;
-      suburb?: string;
-      state?: string;
-      page?: number;
-      pageSize?: number;
-    } = {},
-    isProvider = false,
-  ) {
-    const {
-      status,
-      title,
-      categoryId,
-      suburb,
-      state,
-      page = 1,
-      pageSize = 20,
-    } = filters;
+  async listJobs(filters: JobListFilters = {}, isProvider = false) {
+    const { page, pageSize } = PaginationHelper.normalize({
+      page: filters.page,
+      pageSize: filters.pageSize,
+    });
 
     const where: any = {};
-
     if (isProvider) {
       where.status = JobStatus.OPEN;
     }
+    if (filters.status) where.status = filters.status;
+    if (filters.title) where.title = { contains: filters.title, mode: 'insensitive' };
+    if (filters.categoryId) where.categoryId = filters.categoryId;
+    if (filters.suburb) where.suburb = filters.suburb;
+    if (filters.state) where.state = filters.state;
 
-    if (status) where.status = status;
-    if (title) where.title = { contains: title, mode: 'insensitive' };
-    if (categoryId) where.categoryId = categoryId;
-    if (suburb) where.suburb = suburb;
-    if (state) where.state = state;
+    const skip = PaginationHelper.calculateSkip(page, pageSize);
 
-    const skip = (page - 1) * pageSize;
+    const [jobs, total] = await Promise.all([
+      this.jobRepository.findManyWithRelations(where, skip, pageSize),
+      this.jobRepository.countJobs(where),
+    ]);
 
-    const jobs = await this.jobRepository.findManyWithRelations(where, skip, pageSize);
-    const total = await this.jobRepository.countJobs(where);
-
-    return {
-      data: jobs,
-      pagination: {
-        page,
-        pageSize,
-        total,
-        totalPages: Math.ceil(total / pageSize),
-      },
-    };
+    return PaginationHelper.buildResponse(jobs, total, page, pageSize);
   }
 
   async updateJob(jobId: string, customerId: string, updateJobDto: UpdateJobDto) {
-    const job = await this.jobRepository.findUnique({ id: jobId });
+    const job = await this.jobRepository.findByIdOrThrow(jobId, 'Job');
 
-    if (!job) {
-      throw new ResourceNotFoundException('Job');
-    }
-
-    if (job.customerId !== customerId) {
-      throw new UnauthorizedActionException();
-    }
-
-    if (job.status !== JobStatus.OPEN) {
-      throw new InvalidJobStatusException('Only open jobs can be updated');
-    }
-
-    const updateInput = {
-      ...updateJobDto,
-      preferredDate: updateJobDto.preferredDate
-        ? new Date(updateJobDto.preferredDate)
-        : undefined,
-    };
+    AuthorizationHelper.ensureOwner(job, customerId, 'customerId');
+    StatusValidator.requireStatus(job, JobStatus.OPEN, 'Only open jobs can be updated');
 
     return this.jobRepository.update(
       { id: jobId },
-      updateInput,
+      {
+        ...updateJobDto,
+        preferredDate: DateHelper.parseOrUndefined(updateJobDto.preferredDate),
+      },
     );
   }
 
   async cancelJob(jobId: string, customerId: string) {
-    const job = await this.jobRepository.findUnique({ id: jobId });
+    const job = await this.jobRepository.findByIdOrThrow(jobId, 'Job');
 
-    if (!job) {
-      throw new ResourceNotFoundException('Job');
-    }
-
-    if (job.customerId !== customerId) {
-      throw new UnauthorizedActionException();
-    }
-
-    if (job.status !== JobStatus.OPEN) {
-      throw new InvalidJobStatusException('Only open jobs can be cancelled');
-    }
+    AuthorizationHelper.ensureOwner(job, customerId, 'customerId');
+    StatusValidator.requireStatus(job, JobStatus.OPEN, 'Only open jobs can be cancelled');
 
     return this.jobRepository.cancelJobWithHistory(jobId, customerId);
   }
 
   async completeJob(jobId: string, userId: string) {
-    const job = await this.jobRepository.findUnique({ id: jobId });
-
-    if (!job) {
-      throw new ResourceNotFoundException('Job');
-    }
+    const job = await this.jobRepository.findByIdOrThrow(jobId, 'Job');
 
     const isCustomer = job.customerId === userId;
     const isProvider = job.assignedProviderId === userId;
-
     if (!isCustomer && !isProvider) {
       throw new UnauthorizedActionException();
     }
 
-    if (job.status !== JobStatus.ASSIGNED) {
-      throw new InvalidJobStatusException('Only assigned jobs can be completed');
-    }
+    StatusValidator.requireStatus(
+      job,
+      JobStatus.ASSIGNED,
+      'Only assigned jobs can be completed',
+    );
 
     return this.jobRepository.completeJobWithTransaction(jobId, userId, job.status);
   }
@@ -207,24 +165,14 @@ export class JobsService {
     customerId: string,
     pagination: { page: number; pageSize: number },
   ) {
-    const { page = 1, pageSize = 20 } = pagination;
-    const skip = (page - 1) * pageSize;
+    const { page, pageSize } = PaginationHelper.normalize(pagination);
+    const skip = PaginationHelper.calculateSkip(page, pageSize);
 
-    const jobs = await this.jobRepository.findManyWithRelations(
-      { customerId },
-      skip,
-      pageSize,
-    );
-    const total = await this.jobRepository.countJobs({ customerId });
+    const [jobs, total] = await Promise.all([
+      this.jobRepository.findManyWithRelations({ customerId }, skip, pageSize),
+      this.jobRepository.countJobs({ customerId }),
+    ]);
 
-    return {
-      data: jobs,
-      pagination: {
-        page,
-        pageSize,
-        total,
-        totalPages: Math.ceil(total / pageSize),
-      },
-    };
+    return PaginationHelper.buildResponse(jobs, total, page, pageSize);
   }
 }

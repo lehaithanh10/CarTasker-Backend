@@ -1,12 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
 import { UserRepository } from '@/repositories/user.repository';
 import { UpdateUserDto, UpdatePasswordDto } from './dto/user.dto';
 import { InvalidCredentialsException } from '@/common/exceptions';
+import { PasswordService } from '@/common/services/password.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private userRepository: UserRepository) {}
+  constructor(
+    private userRepository: UserRepository,
+    private passwordService: PasswordService,
+  ) {}
 
   async findById(userId: string) {
     return this.userRepository.findUnique({ id: userId });
@@ -19,15 +22,15 @@ export class UsersService {
   async updatePassword(userId: string, updatePasswordDto: UpdatePasswordDto) {
     const user = await this.userRepository.findUnique({ id: userId });
 
-    if (!user || !(await bcrypt.compare(updatePasswordDto.currentPassword, user.passwordHash))) {
+    if (
+      !user ||
+      !(await this.passwordService.verify(updatePasswordDto.currentPassword, user.passwordHash))
+    ) {
       throw new InvalidCredentialsException('Current password is incorrect');
     }
 
-    const hashedNewPassword = await bcrypt.hash(updatePasswordDto.newPassword, 10);
+    const hashedNewPassword = await this.passwordService.hash(updatePasswordDto.newPassword);
 
-    return this.userRepository.update(
-      { id: userId },
-      { passwordHash: hashedNewPassword }
-    );
+    return this.userRepository.update({ id: userId }, { passwordHash: hashedNewPassword });
   }
 }

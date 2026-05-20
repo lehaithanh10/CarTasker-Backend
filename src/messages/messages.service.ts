@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { MessageRepository } from '@/repositories/message.repository';
 import { CreateMessageDto } from './dto/message.dto';
-import {
-  ResourceNotFoundException,
-} from '@/common/exceptions';
+import { ResourceNotFoundException } from '@/common/exceptions';
 
 @Injectable()
 export class MessagesService {
@@ -12,37 +10,20 @@ export class MessagesService {
   async getConversations(userId: string) {
     return this.messageRepository.findMany({
       where: {
-        OR: [
-          { senderId: userId },
-        ],
+        OR: [{ senderId: userId }],
       },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   async getConversation(conversationId: string) {
-    const messages = await this.messageRepository.findMany({
-      where: { conversationId },
-    });
-
-    if (!messages || messages.length === 0) {
-      throw new ResourceNotFoundException('Conversation');
-    }
-
-    return messages;
+    return this.findConversationMessagesOrThrow(conversationId);
   }
 
   async getConversationMessages(conversationId: string) {
-    const messages = await this.messageRepository.findMany({
-      where: { conversationId },
+    return this.findConversationMessagesOrThrow(conversationId, {
       orderBy: { createdAt: 'desc' },
     });
-
-    if (!messages || messages.length === 0) {
-      throw new ResourceNotFoundException('Conversation');
-    }
-
-    return messages;
   }
 
   async sendMessage(
@@ -59,15 +40,23 @@ export class MessagesService {
   }
 
   async markMessageAsRead(messageId: string) {
-    const message = await this.messageRepository.findUnique({ id: messageId });
+    await this.messageRepository.findByIdOrThrow(messageId, 'Message');
+    return this.messageRepository.update({ id: messageId }, { isRead: true });
+  }
 
-    if (!message) {
-      throw new ResourceNotFoundException('Message');
+  private async findConversationMessagesOrThrow(
+    conversationId: string,
+    extraQuery: Record<string, any> = {},
+  ) {
+    const messages = await this.messageRepository.findMany({
+      where: { conversationId },
+      ...extraQuery,
+    });
+
+    if (!messages || messages.length === 0) {
+      throw new ResourceNotFoundException('Conversation');
     }
 
-    return this.messageRepository.update(
-      { id: messageId },
-      { isRead: true }
-    );
+    return messages;
   }
 }
