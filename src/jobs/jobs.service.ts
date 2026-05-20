@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { JobRepository } from '@/repositories/job.repository';
 import { CategoryRepository } from '@/repositories/category.repository';
+import { BidRepository } from '@/repositories/bid.repository';
 import { CreateJobDto, UpdateJobDto } from './dto/job.dto';
 import {
   ResourceNotFoundException,
@@ -14,6 +15,7 @@ export class JobsService {
   constructor(
     private jobRepository: JobRepository,
     private categoryRepository: CategoryRepository,
+    private bidRepository: BidRepository,
   ) {}
 
   async createJob(customerId: string, createJobDto: CreateJobDto) {
@@ -42,14 +44,46 @@ export class JobsService {
     return job;
   }
 
-  async getJobById(jobId: string) {
-    const job = await this.jobRepository.findUnique({ id: jobId });
+  async getJobById(jobId: string, currentUserId?: string, currentUserRole?: string) {
+    const job = await this.jobRepository.findByIdWithCategory(jobId);
 
     if (!job) {
       throw new ResourceNotFoundException('Job');
     }
 
-    return job;
+    const bidsCount = await this.bidRepository.countPendingByJob(jobId);
+
+    const response: any = {
+      id: job.id,
+      title: job.title,
+      description: job.description,
+      locationText: job.locationText,
+      suburb: job.suburb,
+      state: job.state,
+      preferredDate: job.preferredDate,
+      category: job.category,
+      status: job.status,
+      assignedProviderId: job.assignedProviderId,
+      createdAt: job.createdAt,
+      customerId: job.customerId,
+      customer: job.customer,
+      bidsCount,
+    };
+
+    // Enrich with provider-specific bid info
+    if (currentUserRole === 'provider' && currentUserId) {
+      const [otherBidsCount, lowestBidAmount, myBid] = await Promise.all([
+        this.bidRepository.countPendingByJobExcludingProvider(jobId, currentUserId),
+        this.bidRepository.findLowestPendingByJobExcludingProvider(jobId, currentUserId),
+        this.bidRepository.findByJobAndProvider(jobId, currentUserId),
+      ]);
+
+      response.otherBidsCount = otherBidsCount;
+      response.lowestBidAmount = lowestBidAmount;
+      response.myBid = myBid || null;
+    }
+
+    return response;
   }
 
   async listJobs(

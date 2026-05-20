@@ -9,6 +9,7 @@ import { BidsModule } from './bids/bids.module';
 import { MessagesModule } from './messages/messages.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
@@ -16,6 +17,8 @@ import { PrismaModule } from './prisma/prisma.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    CommonModule,
+    PrismaModule,
     AuthModule,
     UsersModule,
     ProvidersModule,
@@ -24,7 +27,6 @@ import { PrismaModule } from './prisma/prisma.module';
     BidsModule,
     MessagesModule,
     DashboardModule,
-    PrismaModule,
   ],
   providers: [
     {

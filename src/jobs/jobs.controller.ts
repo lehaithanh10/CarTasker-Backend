@@ -75,9 +75,14 @@ export class JobsController {
   }
 
   @Get(':jobId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get job details' })
-  async getJob(@Param('jobId') jobId: string) {
-    return this.jobsService.getJobById(jobId);
+  async getJob(
+    @Param('jobId') jobId: string,
+    @CurrentUser() user?: CurrentUserPayload,
+  ) {
+    return this.jobsService.getJobById(jobId, user?.userId, user?.role);
   }
 
   @Patch(':jobId')

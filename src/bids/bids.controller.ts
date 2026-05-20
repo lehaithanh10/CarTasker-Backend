@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { BidsService } from './bids.service';
-import { CreateJobBidDto } from './dto/bid.dto';
+import { CreateJobBidDto, UpdateJobBidDto } from './dto/bid.dto';
 import { JwtAuthGuard, RolesGuard } from '@/common/guards';
 import { CurrentUser, CurrentUserPayload, Roles } from '@/common/decorators';
 import { UserRole } from '@/common/enums';
@@ -43,6 +43,23 @@ export class BidsController {
   ) {
     return this.bidsService.getBidsForJob(jobId, user.userId);
   }
+}
+
+@ApiTags('bids')
+@Controller('bids')
+export class BidActionsController {
+  constructor(private bidsService: BidsService) {}
+
+  @Get('my')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PROVIDER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get provider\'s bids' })
+  async getMyBids(
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.bidsService.getProviderBids(user.userId);
+  }
 
   @Patch(':bidId')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -50,13 +67,11 @@ export class BidsController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a bid' })
   async updateBid(
-    // @Param('bidId') bidId: string,
-    // @CurrentUser() user: CurrentUserPayload,
-    // @Body() updateBidDto: CreateJobBidDto,
+    @Param('bidId') bidId: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() updateBidDto: UpdateJobBidDto,
   ) {
-    // For now, we'll leave bid updates to withdrawing and accepting
-    // This endpoint can be extended to allow partial updates
-    return { message: 'Bid update not yet implemented' };
+    return this.bidsService.updateBid(bidId, user.userId, updateBidDto);
   }
 
   @Post(':bidId/withdraw')
@@ -96,9 +111,3 @@ export class BidsController {
     return this.bidsService.rejectBid(bidId, user.userId);
   }
 }
-
-// @ApiTags('bids')
-// @Controller('bids')
-// export class BidActionsController {
-//   constructor(private bidsService: BidsService) {}
-// }

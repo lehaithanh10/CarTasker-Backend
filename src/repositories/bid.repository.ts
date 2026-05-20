@@ -121,6 +121,9 @@ export class BidRepository extends BaseRepository<JobBid, CreateJobBidInput, Upd
             title: true,
             description: true,
             status: true,
+            locationText: true,
+            suburb: true,
+            state: true,
           },
         },
       },
@@ -132,7 +135,19 @@ export class BidRepository extends BaseRepository<JobBid, CreateJobBidInput, Upd
     const total = await this.prisma.jobBid.count({ where: { providerId } });
 
     return {
-      bids,
+      bids: bids.map(bid => ({
+        id: bid.id,
+        jobId: bid.jobId,
+        providerId: bid.providerId,
+        bidAmount: bid.bidAmount,
+        message: bid.message,
+        estimatedArrivalHours: bid.estimatedArrivalHours,
+        status: bid.status,
+        createdAt: bid.createdAt,
+        updatedAt: bid.updatedAt,
+        jobTitle: bid.job.title,
+        jobLocation: bid.job.locationText || `${bid.job.suburb}, ${bid.job.state}`,
+      })),
       total,
     };
   }
@@ -141,6 +156,51 @@ export class BidRepository extends BaseRepository<JobBid, CreateJobBidInput, Upd
     return this.prisma.jobBid.findUnique({
       where: { id: bidId },
       include: { job: true },
+    });
+  }
+
+  async countPendingByJob(jobId: string) {
+    return this.prisma.jobBid.count({
+      where: { jobId, status: 'pending' },
+    });
+  }
+
+  async countPendingByJobExcludingProvider(jobId: string, providerId: string) {
+    return this.prisma.jobBid.count({
+      where: {
+        jobId,
+        providerId: { not: providerId },
+        status: 'pending',
+      },
+    });
+  }
+
+  async findLowestPendingByJobExcludingProvider(jobId: string, providerId: string) {
+    const bids = await this.prisma.jobBid.findMany({
+      where: {
+        jobId,
+        providerId: { not: providerId },
+        status: 'pending',
+      },
+      orderBy: { bidAmount: 'asc' },
+      take: 1,
+    });
+    return bids[0]?.bidAmount || null;
+  }
+
+  async findManyByJobWithProvider(jobId: string) {
+    return this.prisma.jobBid.findMany({
+      where: { jobId },
+      include: {
+        provider: {
+          select: {
+            id: true,
+            fullName: true,
+            phone: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 }
