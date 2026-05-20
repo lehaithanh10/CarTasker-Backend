@@ -3,6 +3,7 @@ import { ORMAdapter } from './adapters/orm.adapter';
 import { ORM_ADAPTER_TOKEN } from './adapters/orm.adapter.token';
 import { BaseRepository } from './base.repository';
 import { PrismaService } from '@/prisma/prisma.service';
+import { BidStatus, JobStatus } from '@/common/enums';
 
 export interface JobBid {
   id: string;
@@ -55,22 +56,22 @@ export class BidRepository extends BaseRepository<JobBid, CreateJobBidInput, Upd
     return this.prisma.$transaction(async (tx: any) => {
       const acceptedBid = await tx.jobBid.update({
         where: { id: bidId },
-        data: { status: 'accepted' },
+        data: { status: BidStatus.ACCEPTED },
       });
 
       await tx.jobBid.updateMany({
         where: {
           jobId,
           id: { not: bidId },
-          status: 'pending',
+          status: BidStatus.PENDING,
         },
-        data: { status: 'rejected' },
+        data: { status: BidStatus.REJECTED },
       });
 
       const updatedJob = await tx.job.update({
         where: { id: jobId },
         data: {
-          status: 'assigned',
+          status: JobStatus.ASSIGNED,
           assignedProviderId: providerId,
         },
       });
@@ -96,7 +97,7 @@ export class BidRepository extends BaseRepository<JobBid, CreateJobBidInput, Upd
         data: {
           jobId,
           oldStatus,
-          newStatus: 'assigned',
+          newStatus: JobStatus.ASSIGNED,
           changedBy: customerId,
           note: `Bid from provider ${providerId} accepted`,
         },
@@ -161,7 +162,24 @@ export class BidRepository extends BaseRepository<JobBid, CreateJobBidInput, Upd
 
   async countPendingByJob(jobId: string) {
     return this.prisma.jobBid.count({
-      where: { jobId, status: 'pending' },
+      where: { jobId, status: BidStatus.PENDING },
+    });
+  }
+
+  async countByProviderAndStatus(providerId: string, status: string) {
+    return this.prisma.jobBid.count({ where: { providerId, status } });
+  }
+
+  async findRecentByProvider(providerId: string, limit: number) {
+    return this.prisma.jobBid.findMany({
+      where: { providerId },
+      include: {
+        job: {
+          select: { title: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
     });
   }
 
@@ -170,7 +188,7 @@ export class BidRepository extends BaseRepository<JobBid, CreateJobBidInput, Upd
       where: {
         jobId,
         providerId: { not: providerId },
-        status: 'pending',
+        status: BidStatus.PENDING,
       },
     });
   }
@@ -180,7 +198,7 @@ export class BidRepository extends BaseRepository<JobBid, CreateJobBidInput, Upd
       where: {
         jobId,
         providerId: { not: providerId },
-        status: 'pending',
+        status: BidStatus.PENDING,
       },
       orderBy: { bidAmount: 'asc' },
       take: 1,

@@ -9,9 +9,18 @@ import {
   CannotBidOnOwnJobException,
   BidAlreadyExistsException,
   // ProviderProfileRequiredException,
-  InvalidJobStatusException,
 } from '@/common/exceptions';
 import { BidStatus, JobStatus } from '@/common/enums';
+import {
+  PaginationHelper,
+  AuthorizationHelper,
+  StatusValidator,
+} from '@/common/helpers';
+
+interface BidPaginationFilters {
+  page?: number;
+  pageSize?: number;
+}
 
 @Injectable()
 export class BidsService {
@@ -22,21 +31,13 @@ export class BidsService {
   ) {}
 
   async createBid(jobId: string, providerId: string, createBidDto: CreateJobBidDto) {
-    const job = await this.jobRepository.findUnique({ id: jobId });
-
-    if (!job) {
-      throw new ResourceNotFoundException('Job');
-    }
+    const job = await this.jobRepository.findByIdOrThrow(jobId, 'Job');
 
     if (job.customerId === providerId) {
       throw new CannotBidOnOwnJobException();
     }
 
-    if (job.status !== JobStatus.OPEN) {
-      throw new InvalidJobStatusException('Job is not open for bids');
-    }
-
-    console.log('Checking if provider has profile:', providerId);
+    StatusValidator.requireStatus(job, JobStatus.OPEN, 'Job is not open for bids');
 
     // const hasProfile = await this.providersService.hasProfile(providerId);
     // if (!hasProfile) {
@@ -44,7 +45,6 @@ export class BidsService {
     // }
 
     const existingBid = await this.bidRepository.findByJobAndProvider(jobId, providerId);
-
     if (existingBid) {
       throw new BidAlreadyExistsException();
     }
@@ -60,96 +60,76 @@ export class BidsService {
   }
 
   async getBidsForJob(jobId: string, customerId: string) {
-    const job = await this.jobRepository.findUnique({ id: jobId });
+    const job = await this.jobRepository.findByIdOrThrow(jobId, 'Job');
 
-    if (!job) {
-      throw new ResourceNotFoundException('Job');
-    }
-
-    if (job.customerId !== customerId) {
-      throw new UnauthorizedActionException('Only job owner can view bids');
-    }
+    AuthorizationHelper.ensureOwner(
+      job,
+      customerId,
+      'customerId',
+      'Only job owner can view bids',
+    );
 
     return this.bidRepository.findManyByJobWithProvider(jobId);
   }
 
   async updateBid(bidId: string, providerId: string, updateBidDto: UpdateJobBidDto) {
-    const bid = await this.bidRepository.findUnique({ id: bidId });
+    const bid = await this.bidRepository.findByIdOrThrow(bidId, 'Bid');
 
-    if (!bid) {
-      throw new ResourceNotFoundException('Bid');
-    }
-
-    if (bid.providerId !== providerId) {
-      throw new UnauthorizedActionException();
-    }
-
-    if (bid.status !== BidStatus.PENDING) {
-      throw new InvalidJobStatusException('Only pending bids can be updated');
-    }
-
-    const job = await this.jobRepository.findUnique({ id: bid.jobId });
-
-    if (!job) {
-      throw new ResourceNotFoundException('Job');
-    }
-
-    if (job.status !== JobStatus.OPEN) {
-      throw new InvalidJobStatusException('Job is not open for bid updates');
-    }
-
-    return this.bidRepository.update(
-      { id: bidId },
-      updateBidDto,
+    AuthorizationHelper.ensureOwner(bid, providerId, 'providerId');
+    StatusValidator.requireStatus(
+      bid,
+      BidStatus.PENDING,
+      'Only pending bids can be updated',
     );
+
+    const job = await this.jobRepository.findByIdOrThrow(bid.jobId, 'Job');
+    StatusValidator.requireStatus(
+      job,
+      JobStatus.OPEN,
+      'Job is not open for bid updates',
+    );
+
+    return this.bidRepository.update({ id: bidId }, updateBidDto);
   }
 
   async withdrawBid(bidId: string, providerId: string) {
-    const bid = await this.bidRepository.findUnique({ id: bidId });
+    const bid = await this.bidRepository.findByIdOrThrow(bidId, 'Bid');
 
-    if (!bid) {
-      throw new ResourceNotFoundException('Bid');
-    }
-
-    if (bid.providerId !== providerId) {
-      throw new UnauthorizedActionException();
-    }
-
-    if (bid.status !== BidStatus.PENDING) {
-      throw new InvalidJobStatusException('Only pending bids can be withdrawn');
-    }
+    AuthorizationHelper.ensureOwner(bid, providerId, 'providerId');
+    StatusValidator.requireStatus(
+      bid,
+      BidStatus.PENDING,
+      'Only pending bids can be withdrawn',
+    );
 
     return this.bidRepository.delete({ id: bidId });
   }
 
   async acceptBid(jobId: string, bidId: string, customerId: string) {
-    const job = await this.jobRepository.findUnique({ id: jobId });
+    const job = await this.jobRepository.findByIdOrThrow(jobId, 'Job');
+    AuthorizationHelper.ensureOwner(
+      job,
+      customerId,
+      'customerId',
+      'Only job owner can accept bids',
+    );
 
-    if (!job) {
-      throw new ResourceNotFoundException('Job');
-    }
-
-    if (job.customerId !== customerId) {
-      throw new UnauthorizedActionException('Only job owner can accept bids');
-    }
-
-    const bid = await this.bidRepository.findUnique({ id: bidId });
-
-    if (!bid) {
-      throw new ResourceNotFoundException('Bid');
-    }
+    const bid = await this.bidRepository.findByIdOrThrow(bidId, 'Bid');
 
     if (bid.jobId !== jobId) {
       throw new UnauthorizedActionException('Bid does not belong to this job');
     }
 
-    if (bid.status !== BidStatus.PENDING) {
-      throw new InvalidJobStatusException('Only pending bids can be accepted');
-    }
-
-    if (job.status !== JobStatus.OPEN) {
-      throw new InvalidJobStatusException('Job is not open for bid acceptance');
-    }
+    StatusValidator.requireStatus(
+      bid,
+      BidStatus.PENDING,
+      'Only pending bids can be accepted',
+    );
+    StatusValidator.requireStatus(
+      job,
+      JobStatus.OPEN,
+      'Job is not open for bid acceptance',
+    );
 
     return this.bidRepository.acceptBidWithTransaction(
       bidId,
@@ -171,29 +151,22 @@ export class BidsService {
       throw new UnauthorizedActionException('Only job owner can reject bids');
     }
 
-    if (bid.status !== BidStatus.PENDING) {
-      throw new InvalidJobStatusException('Only pending bids can be rejected');
-    }
-
-    return this.bidRepository.update(
-      { id: bidId },
-      { status: BidStatus.REJECTED }
+    StatusValidator.requireStatus(
+      bid,
+      BidStatus.PENDING,
+      'Only pending bids can be rejected',
     );
+
+    return this.bidRepository.update({ id: bidId }, { status: BidStatus.REJECTED });
   }
 
   async getBid(bidId: string) {
-    const bid = await this.bidRepository.findUnique({ id: bidId });
-
-    if (!bid) {
-      throw new ResourceNotFoundException('Bid');
-    }
-
-    return bid;
+    return this.bidRepository.findByIdOrThrow(bidId, 'Bid');
   }
 
-  async getProviderBids(providerId: string, filters: any = {}) {
-    const { page = 1, pageSize = 20 } = filters;
-    const skip = (page - 1) * pageSize;
+  async getProviderBids(providerId: string, filters: BidPaginationFilters = {}) {
+    const { page, pageSize } = PaginationHelper.normalize(filters);
+    const skip = PaginationHelper.calculateSkip(page, pageSize);
 
     const { bids, total } = await this.bidRepository.getProviderBidsWithPagination(
       providerId,
@@ -201,14 +174,6 @@ export class BidsService {
       pageSize,
     );
 
-    return {
-      data: bids,
-      pagination: {
-        page,
-        pageSize,
-        total,
-        totalPages: Math.ceil(total / pageSize),
-      },
-    };
+    return PaginationHelper.buildResponse(bids, total, page, pageSize);
   }
 }

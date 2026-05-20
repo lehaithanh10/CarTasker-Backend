@@ -3,6 +3,7 @@ import { ORMAdapter } from './adapters/orm.adapter';
 import { ORM_ADAPTER_TOKEN } from './adapters/orm.adapter.token';
 import { BaseRepository } from './base.repository';
 import { PrismaService } from '@/prisma/prisma.service';
+import { JobStatus } from '@/common/enums';
 
 export interface Job {
   id: string;
@@ -117,11 +118,47 @@ export class JobRepository extends BaseRepository<Job, CreateJobInput, UpdateJob
     return this.prisma.job.count({ where });
   }
 
+  async countByCustomerAndStatus(customerId: string, status: string) {
+    return this.prisma.job.count({ where: { customerId, status } });
+  }
+
+  async countByStatus(status: string) {
+    return this.prisma.job.count({ where: { status } });
+  }
+
+  async countByAssignedProviderAndStatus(providerId: string, status: string) {
+    return this.prisma.job.count({
+      where: { assignedProviderId: providerId, status },
+    });
+  }
+
+  async countAssignmentsByProvider(providerId: string) {
+    return this.prisma.jobAssignment.count({ where: { providerId } });
+  }
+
+  async findRecentByCustomerAndStatus(
+    customerId: string,
+    status: string,
+    limit: number,
+  ) {
+    return this.prisma.job.findMany({
+      where: { customerId, status },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+  }
+
   async completeJobWithTransaction(jobId: string, userId: string, oldStatus: string) {
     return this.prisma.$transaction(async (tx: any) => {
       const updatedJob = await tx.job.update({
         where: { id: jobId },
-        data: { status: 'completed' },
+        data: { status: JobStatus.COMPLETED },
       });
 
       await tx.jobAssignment.update({
@@ -133,7 +170,7 @@ export class JobRepository extends BaseRepository<Job, CreateJobInput, UpdateJob
         data: {
           jobId,
           oldStatus,
-          newStatus: 'completed',
+          newStatus: JobStatus.COMPLETED,
           changedBy: userId,
         },
       });
@@ -146,14 +183,14 @@ export class JobRepository extends BaseRepository<Job, CreateJobInput, UpdateJob
     return this.prisma.$transaction(async (tx: any) => {
       const updatedJob = await tx.job.update({
         where: { id: jobId },
-        data: { status: 'cancelled' },
+        data: { status: JobStatus.CANCELLED },
       });
 
       await tx.jobStatusHistory.create({
         data: {
           jobId,
-          oldStatus: 'open',
-          newStatus: 'cancelled',
+          oldStatus: JobStatus.OPEN,
+          newStatus: JobStatus.CANCELLED,
           changedBy: customerId,
         },
       });

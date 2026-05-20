@@ -5,9 +5,6 @@ import {
   CreateProviderProfileDto,
   UpdateProviderProfileDto,
 } from './dto/provider.dto';
-import {
-  ResourceNotFoundException,
-} from '@/common/exceptions';
 
 @Injectable()
 export class ProvidersService {
@@ -36,12 +33,7 @@ export class ProvidersService {
     userId: string,
     updateProfileDto: UpdateProviderProfileDto,
   ) {
-    const profile = await this.providerRepository.findUnique({ userId });
-
-    if (!profile) {
-      throw new ResourceNotFoundException('Provider profile');
-    }
-
+    await this.providerRepository.findByOrThrow({ userId }, 'Provider profile');
     return this.providerRepository.update({ userId }, updateProfileDto);
   }
 
@@ -50,12 +42,7 @@ export class ProvidersService {
   }
 
   async getProviderDetails(providerId: string) {
-    const provider = await this.userRepository.findUnique({ id: providerId });
-
-    if (!provider) {
-      throw new ResourceNotFoundException('Provider');
-    }
-
+    const provider = await this.userRepository.findByIdOrThrow(providerId, 'Provider');
     const profile = await this.providerRepository.findUnique({ userId: providerId });
 
     return {
@@ -66,18 +53,6 @@ export class ProvidersService {
       avatarUrl: provider.avatarUrl,
       profile,
     };
-  }
-
-  async updateServices(
-    userId: string,
-  ) {
-    const profile = await this.providerRepository.findUnique({ userId });
-
-    if (!profile) {
-      throw new ResourceNotFoundException('Provider profile');
-    }
-
-    return profile;
   }
 
   async hasProfile(userId: string): Promise<boolean> {

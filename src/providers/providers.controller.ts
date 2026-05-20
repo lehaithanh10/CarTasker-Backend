@@ -2,7 +2,6 @@ import {
   Controller,
   Get,
   Post,
-  Put,
   Patch,
   Body,
   Param,
@@ -51,16 +50,5 @@ export class ProvidersController {
     @Body() updateProfileDto: UpdateProviderProfileDto,
   ) {
     return this.providersService.updateProfile(user.userId, updateProfileDto);
-  }
-
-  @Put('services')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.PROVIDER)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update provider services' })
-  async updateServices(
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
-    return this.providersService.updateServices(user.userId);
   }
 }

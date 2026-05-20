@@ -1,5 +1,3 @@
-// Barrel re-exports — split files live alongside.
-// Preserves the original `./dto/user.dto` import path.
 export * from './update-user.dto';
 export * from './update-password.dto';
 export * from './user-response.dto';
