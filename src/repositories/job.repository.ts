@@ -62,6 +62,16 @@ export class JobRepository extends BaseRepository<Job, CreateJobInput, UpdateJob
     super(ormAdapter);
   }
 
+  async findByIdWithCategory(id: string) {
+    return this.prisma.job.findUnique({
+      where: { id },
+      include: {
+        category: { select: { id: true, name: true } },
+        customer: { select: { fullName: true, id: true, phone: true, avatarUrl: true } },
+      },
+    });
+  }
+
   async findManyWithRelations(where: any = {}, skip: number, take: number) {
     return this.prisma.job.findMany({
       where,

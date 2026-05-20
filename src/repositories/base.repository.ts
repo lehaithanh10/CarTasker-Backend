@@ -1,4 +1,5 @@
 import { ORMAdapter } from './adapters/orm.adapter';
+import { ResourceNotFoundException } from '@/common/exceptions';
 
 export abstract class BaseRepository<Entity, CreateInput, UpdateInput> {
   protected abstract readonly modelName: string;
@@ -15,6 +16,22 @@ export abstract class BaseRepository<Entity, CreateInput, UpdateInput> {
 
   async findUniqueOrThrow(where: any): Promise<Entity> {
     return this.ormAdapter.findUniqueOrThrow<Entity>(this.modelName, where);
+  }
+
+  async findByIdOrThrow(id: string, resourceName: string): Promise<Entity> {
+    const entity = await this.findUnique({ id });
+    if (!entity) {
+      throw new ResourceNotFoundException(resourceName);
+    }
+    return entity;
+  }
+
+  async findByOrThrow(where: any, resourceName: string): Promise<Entity> {
+    const entity = await this.findUnique(where);
+    if (!entity) {
+      throw new ResourceNotFoundException(resourceName);
+    }
+    return entity;
   }
 
   async findMany(args?: any): Promise<Entity[]> {

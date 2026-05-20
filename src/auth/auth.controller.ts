@@ -14,7 +14,7 @@ import { JwtAuthGuard } from '@/common/guards';
 import { CurrentUser, CurrentUserPayload } from '@/common/decorators';
 
 @ApiTags('auth')
-@Controller(['auth', 'api/v1/auth'])
+@Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
