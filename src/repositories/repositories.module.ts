@@ -6,6 +6,7 @@ import { UserRepository } from './user.repository';
 import { JobRepository } from './job.repository';
 import { BidRepository } from './bid.repository';
 import { MessageRepository } from './message.repository';
+import { ConversationRepository } from './conversation.repository';
 import { ProviderRepository } from './provider.repository';
 import { CategoryRepository } from './category.repository';
 
@@ -14,6 +15,7 @@ const repositories = [
   JobRepository,
   BidRepository,
   MessageRepository,
+  ConversationRepository,
   ProviderRepository,
   CategoryRepository,
 ];

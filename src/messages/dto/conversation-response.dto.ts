@@ -1,28 +1,49 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { MessageResponseDto } from './message-response.dto';
+
+class UserDto {
+  @ApiProperty({ format: 'uuid' })
+  id: string;
+
+  @ApiProperty()
+  fullName: string;
+
+  @ApiProperty({ nullable: true })
+  avatarUrl: string | null;
+}
+
+class LastMessageDto {
+  @ApiProperty()
+  text: string;
+
+  @ApiProperty({ type: Date })
+  createdAt: Date;
+
+  @ApiProperty({ format: 'uuid' })
+  senderId: string;
+}
 
 export class ConversationResponseDto {
-  @ApiProperty({ description: 'Conversation ID', format: 'uuid' })
-  id?: string;
+  @ApiProperty({ format: 'uuid' })
+  id: string;
 
-  @ApiProperty({ description: 'Associated job ID', format: 'uuid' })
-  jobId?: string;
+  @ApiProperty({ format: 'uuid' })
+  jobId: string;
 
-  @ApiProperty({ description: 'Customer user ID', format: 'uuid' })
-  customerId?: string;
+  @ApiProperty()
+  jobTitle: string;
 
-  @ApiProperty({ description: 'Provider user ID', format: 'uuid' })
-  providerId?: string;
+  @ApiProperty({ format: 'uuid' })
+  customerId: string;
 
-  @ApiProperty({
-    description: 'Conversation creation timestamp',
-    format: 'date-time',
-  })
-  createdAt?: Date;
+  @ApiProperty({ format: 'uuid' })
+  providerId: string;
 
-  @ApiProperty({
-    description: 'Messages in this conversation',
-    type: [MessageResponseDto],
-  })
-  messages?: MessageResponseDto[];
+  @ApiProperty({ type: UserDto, description: 'The other party in the conversation' })
+  otherUser: UserDto;
+
+  @ApiProperty({ type: LastMessageDto, nullable: true })
+  lastMessage: LastMessageDto | null;
+
+  @ApiProperty({ type: Number, description: 'Unread message count for current user' })
+  unreadCount: number;
 }
