@@ -23,6 +23,6 @@ import { RepositoriesModule } from '@/repositories/repositories.module';
   ],
   providers: [AuthService, JwtStrategy],
   controllers: [AuthController],
-  exports: [AuthService],
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}
