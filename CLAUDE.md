@@ -177,6 +177,7 @@ npm run seed          # seed service categories
 Authorization rules:
 - `POST /conversations` — caller must be the job's customer **or** the assigned provider (`job.assignedProviderId`). Returns 403 otherwise.
 - `GET/POST .../messages` — caller must be a participant (`customerId` or `providerId`). Returns 403 otherwise.
+- `POST /messages/:id/read` — caller must be a participant in the message's conversation. Returns 403 otherwise. (Without this check any authenticated user could mark another user's messages as read by guessing IDs.)
 - Conversations are **also** auto-created inside `BidRepository.acceptBidWithTransaction` when a bid is accepted — the endpoint is idempotent (upsert by `jobId`).
 
 ### Socket.IO gateway
@@ -184,6 +185,7 @@ Authorization rules:
 - **Namespace**: `/ws`
 - **Auth**: pass JWT in `socket.handshake.auth.token` on connect. Invalid/missing token → socket is disconnected immediately.
 - **Auto-joined room on connect**: `user:<userId>` — receives `unread:changed` events.
+- **CORS**: configured on the IoAdapter in `main.ts` (`CorsIoAdapter` reads `parseCorsOrigins(process.env.CORS_ORIGINS)` at bootstrap), **not** on the `@WebSocketGateway()` decorator. Keeps `process.env` out of business code per §6.
 
 | Client event (emit) | Payload | Effect |
 |---|---|---|
@@ -200,12 +202,26 @@ Authorization rules:
 
 | File | Role |
 |---|---|
-| `src/messages/messages.gateway.ts` | Socket.IO gateway — JWT handshake, room management, emit helpers |
-| `src/messages/messages.service.ts` | Business logic — orchestrates repos + gateway emits |
+| `src/messages/messages.gateway.ts` | Socket.IO gateway — JWT handshake, room management, emit helpers. Decorator is `@WebSocketGateway({ namespace: '/ws' })` only; CORS lives in `main.ts` |
+| `src/messages/messages.service.ts` | Business logic — orchestrates repos + gateway emits. Note: `markMessageAsRead` calls `conversationRepository.isParticipant` before updating |
 | `src/messages/messages.controller.ts` | Two controllers: `MessagesController` (`/conversations`) + `MessageActionsController` (`/messages`) |
-| `src/repositories/conversation.repository.ts` | Prisma-direct repo — `upsertByJobId`, `findManyForUser` (with `_count` unread), `isParticipant` |
+| `src/messages/mappers/conversation.mapper.ts` | `ConversationMapper.toListItem` / `toListItems(rows, viewerUserId)` — Prisma row → `ConversationListItem`. Sorting by last-message timestamp lives here, not in the repo (§2) |
+| `src/repositories/conversation.repository.ts` | Prisma-direct repo — `upsertByJobId`, `findManyForUser` (delegates DTO shaping to `ConversationMapper`), `countUnreadForUser`, `isParticipant` |
 | `src/auth/auth.module.ts` | Exports `JwtModule` so `MessagesModule` can inject `JwtService` into the gateway |
-| `src/main.ts` | Uses `IoAdapter` from `@nestjs/platform-socket.io` |
+| `src/main.ts` | `CorsIoAdapter extends IoAdapter` — overrides `createIOServer` to apply CORS from `process.env.CORS_ORIGINS` (bootstrap is the one place env reads are sanctioned per §6) |
+
+### Conversation DTO mapping (§2)
+
+`ConversationRepository.findManyForUser` queries Prisma with the relations
+needed for the list view (`job`, `customer`, `provider`, latest `message`,
+filtered `_count`) then hands the rows to `ConversationMapper.toListItems`.
+The mapper owns:
+- Picking `otherUser` based on the caller's perspective (`customerId === viewerUserId ? provider : customer`)
+- Flattening `messages[0]` into the `lastMessage` shape (or `null`)
+- Sorting by last-message timestamp descending, nulls last
+
+If you need a new conversation projection (e.g. for admin/analytics), add a
+new method to the mapper rather than inlining the shape in the repo.
 
 ### Installed packages (added)
 - `@nestjs/websockets@10`
