@@ -154,6 +154,136 @@ export class JobRepository extends BaseRepository<Job, CreateJobInput, UpdateJob
     });
   }
 
+  // ─── Completion flow ──────────────────────────────────────────────────────
+
+  /**
+   * Provider requests completion: ASSIGNED → AWAITING_CUSTOMER_CONFIRMATION.
+   * Sets the auto-release deadline on JobAssignment.
+   */
+  async requestCompletionWithTransaction(
+    jobId: string,
+    providerId: string,
+    autoReleaseAt: Date,
+  ) {
+    return this.prisma.$transaction(async (tx: any) => {
+      const updatedJob = await tx.job.update({
+        where: { id: jobId },
+        data: { status: JobStatus.AWAITING_CUSTOMER_CONFIRMATION },
+      });
+
+      await tx.jobAssignment.update({
+        where: { jobId },
+        data: {
+          completionRequestedAt: new Date(),
+          completionRequestedBy: providerId,
+          autoReleaseAt,
+        },
+      });
+
+      await tx.jobStatusHistory.create({
+        data: {
+          jobId,
+          oldStatus: JobStatus.ASSIGNED,
+          newStatus: JobStatus.AWAITING_CUSTOMER_CONFIRMATION,
+          changedBy: providerId,
+          note: 'Provider requested completion',
+        },
+      });
+
+      return updatedJob;
+    });
+  }
+
+  /**
+   * Confirms completion: AWAITING_CUSTOMER_CONFIRMATION → COMPLETED
+   * (or ASSIGNED → COMPLETED for customer shortcut / auto-release).
+   * source: 'customer' | 'customer-shortcut' | 'auto-release'
+   */
+  async confirmCompletionWithTransaction(
+    jobId: string,
+    userId: string,
+    oldStatus: string,
+    source: 'customer' | 'customer-shortcut' | 'auto-release',
+  ) {
+    return this.prisma.$transaction(async (tx: any) => {
+      const updatedJob = await tx.job.update({
+        where: { id: jobId },
+        data: { status: JobStatus.COMPLETED },
+      });
+
+      await tx.jobAssignment.update({
+        where: { jobId },
+        data: { completedAt: new Date() },
+      });
+
+      await tx.jobStatusHistory.create({
+        data: {
+          jobId,
+          oldStatus,
+          newStatus: JobStatus.COMPLETED,
+          changedBy: userId,
+          note: source,
+        },
+      });
+
+      return updatedJob;
+    });
+  }
+
+  /**
+   * Customer disputes completion: AWAITING_CUSTOMER_CONFIRMATION → DISPUTED.
+   */
+  async disputeWithTransaction(
+    jobId: string,
+    customerId: string,
+    reason: string,
+  ) {
+    return this.prisma.$transaction(async (tx: any) => {
+      const updatedJob = await tx.job.update({
+        where: { id: jobId },
+        data: { status: JobStatus.DISPUTED },
+      });
+
+      await tx.jobAssignment.update({
+        where: { jobId },
+        data: {
+          disputedAt: new Date(),
+          disputeReason: reason,
+        },
+      });
+
+      await tx.jobStatusHistory.create({
+        data: {
+          jobId,
+          oldStatus: JobStatus.AWAITING_CUSTOMER_CONFIRMATION,
+          newStatus: JobStatus.DISPUTED,
+          changedBy: customerId,
+          note: reason,
+        },
+      });
+
+      return updatedJob;
+    });
+  }
+
+  /**
+   * Returns all jobs that are AWAITING_CUSTOMER_CONFIRMATION and whose
+   * autoReleaseAt deadline has already passed (used by the cron scheduler).
+   */
+  async findExpiredAwaitingJobs(): Promise<{ jobId: string; customerId: string }[]> {
+    const rows = await this.prisma.jobAssignment.findMany({
+      where: {
+        job: { status: JobStatus.AWAITING_CUSTOMER_CONFIRMATION },
+        autoReleaseAt: { lte: new Date() },
+      },
+      select: { jobId: true, customerId: true },
+    });
+    return rows;
+  }
+
+  // ─── Legacy / existing ────────────────────────────────────────────────────
+
+  /** @deprecated Use confirmCompletionWithTransaction instead */
   async completeJobWithTransaction(jobId: string, userId: string, oldStatus: string) {
     return this.prisma.$transaction(async (tx: any) => {
       const updatedJob = await tx.job.update({

@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { JobsService } from './jobs.service';
-import { CreateJobDto, UpdateJobDto, UnifiedJobListResponseDto } from './dto/job.dto';
+import { CreateJobDto, UpdateJobDto, UnifiedJobListResponseDto, DisputeJobDto } from './dto/job.dto';
 import { JobMapper } from './mappers/job.mapper';
 import { JwtAuthGuard, RolesGuard } from '@/common/guards';
 import { CurrentUser, CurrentUserPayload, Roles } from '@/common/decorators';
@@ -35,22 +35,14 @@ export class JobsController {
 
   @Get()
   @ApiOperation({ summary: 'List jobs (open jobs for providers, all jobs for customers)' })
-  @ApiQuery({ name: 'status', required: false, type: String, description: 'Filter by job status (e.g., "open")' })
-  @ApiQuery({ name: 'title', required: false, type: String, description: 'Filter by job title (partial match)' })
-  @ApiQuery({ name: 'categoryId', required: false, type: String, description: 'Filter by category ID' })
-  @ApiQuery({ name: 'suburb', required: false, type: String, description: 'Filter by suburb' })
-  @ApiQuery({ name: 'state', required: false, type: String, description: 'Filter by state' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number', example: 1 })
-  @ApiQuery({ name: 'pageSize', required: false, type: Number, description: 'Items per page', example: 20 })
-  @ApiResponse({
-    status: 200,
-    description: 'Successfully retrieved list of jobs',
-    type: UnifiedJobListResponseDto,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Bad request - Invalid query parameters',
-  })
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'title', required: false, type: String })
+  @ApiQuery({ name: 'categoryId', required: false, type: String })
+  @ApiQuery({ name: 'suburb', required: false, type: String })
+  @ApiQuery({ name: 'state', required: false, type: String })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'pageSize', required: false, type: Number, example: 20 })
+  @ApiResponse({ status: 200, type: UnifiedJobListResponseDto })
   async listJobs(
     @Query('status') status?: string,
     @Query('title') title?: string,
@@ -70,7 +62,6 @@ export class JobsController {
       pageSize: pageSize ? parseInt(pageSize) : 20,
     });
 
-    // Map response to unified format
     return JobMapper.mapJobsToUnifiedList(response.data, response.pagination);
   }
 
@@ -110,26 +101,83 @@ export class JobsController {
     return this.jobsService.cancelJob(jobId, user.userId);
   }
 
-  @Post(':jobId/complete')
-  @UseGuards(JwtAuthGuard)
+  // ─── Completion flow ────────────────────────────────────────────────────────
+
+  /**
+   * Provider signals the work is done.
+   * Transitions ASSIGNED → AWAITING_CUSTOMER_CONFIRMATION and starts the
+   * auto-release clock (default 48 h, configurable via AUTO_RELEASE_HOURS).
+   */
+  @Post(':jobId/complete/request')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.PROVIDER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Mark job as complete' })
+  @ApiOperation({ summary: 'Provider requests job completion (ASSIGNED → AWAITING_CUSTOMER_CONFIRMATION)' })
+  async requestCompletion(
+    @Param('jobId') jobId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.jobsService.requestCompletion(jobId, user.userId);
+  }
+
+  /**
+   * Customer confirms the provider's completion request.
+   * Transitions AWAITING_CUSTOMER_CONFIRMATION → COMPLETED.
+   */
+  @Post(':jobId/complete/confirm')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Customer confirms job completion (AWAITING_CUSTOMER_CONFIRMATION → COMPLETED)' })
+  async confirmCompletion(
+    @Param('jobId') jobId: string,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.jobsService.confirmCompletion(jobId, user.userId);
+  }
+
+  /**
+   * Customer shortcut — directly marks a job complete without waiting for the
+   * two-step flow (e.g. "I've verified the work myself"). Also handles
+   * AWAITING → COMPLETED via the same service method.
+   * Transitions ASSIGNED or AWAITING_CUSTOMER_CONFIRMATION → COMPLETED.
+   */
+  @Post(':jobId/complete')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Customer marks job complete (shortcut — works from ASSIGNED or AWAITING_CUSTOMER_CONFIRMATION)' })
   async completeJob(
     @Param('jobId') jobId: string,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.jobsService.completeJob(jobId, user.userId);
+    return this.jobsService.confirmCompletion(jobId, user.userId);
   }
+
+  /**
+   * Customer disputes the provider's completion request.
+   * Transitions AWAITING_CUSTOMER_CONFIRMATION → DISPUTED.
+   */
+  @Post(':jobId/dispute')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Customer disputes job completion (AWAITING_CUSTOMER_CONFIRMATION → DISPUTED)' })
+  async disputeCompletion(
+    @Param('jobId') jobId: string,
+    @CurrentUser() user: CurrentUserPayload,
+    @Body() body: DisputeJobDto,
+  ) {
+    return this.jobsService.disputeCompletion(jobId, user.userId, body.reason);
+  }
+
+  // ─── Customer-scoped job list ───────────────────────────────────────────────
 
   @Get('customer/:customerId')
   @ApiOperation({ summary: 'Get all jobs for a specific customer' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number', example: 1 })
-  @ApiQuery({ name: 'pageSize', required: false, type: Number, description: 'Items per page', example: 20 })
-  @ApiResponse({
-    status: 200,
-    description: 'Successfully retrieved customer jobs',
-    type: UnifiedJobListResponseDto,
-  })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'pageSize', required: false, type: Number, example: 20 })
+  @ApiResponse({ status: 200, type: UnifiedJobListResponseDto })
   async getCustomerJobs(
     @Param('customerId') customerId: string,
     @Query('page') page?: string,
@@ -140,7 +188,6 @@ export class JobsController {
       pageSize: pageSize ? parseInt(pageSize) : 20,
     });
 
-    // Map response to unified format
     return JobMapper.mapJobsToUnifiedList(response.data, response.pagination);
   }
 }
