@@ -7,8 +7,10 @@ export enum UserRole {
 export enum JobStatus {
   OPEN = 'open',
   ASSIGNED = 'assigned',
+  AWAITING_CUSTOMER_CONFIRMATION = 'awaiting_customer_confirmation',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
+  DISPUTED = 'disputed',
 }
 
 export enum BidStatus {
