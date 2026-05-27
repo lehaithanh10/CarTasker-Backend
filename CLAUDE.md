@@ -226,7 +226,7 @@ npm run seed             # seed service categories
 |---|---|---|---|
 | `POST` | `/jobs` | Customer | |
 | `GET` | `/jobs` | Public | Filters: `status`, `title`, `categoryId`, `suburb`, `state`, `page`, `pageSize` |
-| `GET` | `/jobs/:jobId` | JWT | Provider response includes `myBid`, `otherBidsCount`, `lowestBidAmount` |
+| `GET` | `/jobs/:jobId` | Public (auth-aware) | **Unauthenticated** → scrubbed public shape (no PII, no bids). **Customer JWT** → adds `customerId`, `customer`, `locationText`, `assignedProviderId`. **Provider JWT** → also adds `myBid`, `otherBidsCount`, `lowestBidAmount`. |
 | `PATCH` | `/jobs/:jobId` | Customer | Only when `OPEN` |
 | `POST` | `/jobs/:jobId/cancel` | Customer | Only when `OPEN` |
 | `POST` | `/jobs/:jobId/complete/request` | Provider | `ASSIGNED → AWAITING_CUSTOMER_CONFIRMATION` |

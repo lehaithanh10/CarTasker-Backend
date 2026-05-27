@@ -12,7 +12,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@ne
 import { JobsService } from './jobs.service';
 import { CreateJobDto, UpdateJobDto, UnifiedJobListResponseDto, DisputeJobDto } from './dto/job.dto';
 import { JobMapper } from './mappers/job.mapper';
-import { JwtAuthGuard, RolesGuard } from '@/common/guards';
+import { JwtAuthGuard, OptionalJwtAuthGuard, RolesGuard } from '@/common/guards';
 import { CurrentUser, CurrentUserPayload, Roles } from '@/common/decorators';
 import { UserRole } from '@/common/enums';
 
@@ -66,9 +66,8 @@ export class JobsController {
   }
 
   @Get(':jobId')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get job details' })
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Get job details. Unauthenticated requests receive a scrubbed public response (no customer PII, no bid data).' })
   async getJob(
     @Param('jobId') jobId: string,
     @CurrentUser() user?: CurrentUserPayload,
