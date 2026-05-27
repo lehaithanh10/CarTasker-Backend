@@ -14,8 +14,9 @@ export class JobMapper {
       suburb: rawJob.suburb,
       state: rawJob.state,
       preferredDate: rawJob.preferredDate,
-      bidsCount: rawJob.bids.length || 0,
+      bidsCount: rawJob.bids?.length || 0,
       status: rawJob.status,
+      createdAt: rawJob.createdAt,
       category: {
         id: rawJob.category?.id || rawJob.categoryId,
         name: rawJob.category?.name,

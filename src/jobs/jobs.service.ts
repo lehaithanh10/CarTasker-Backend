@@ -297,4 +297,36 @@ export class JobsService {
 
     return PaginationHelper.buildResponse(jobs, total, page, pageSize);
   }
+
+  /**
+   * Returns paginated jobs where the provider is the assigned provider.
+   * Defaults to history statuses (completed, disputed, cancelled) when no
+   * statuses are provided. Callers may pass explicit statuses to widen/narrow
+   * the result (e.g. include ASSIGNED for the active tab).
+   */
+  async getJobsByAssignedProviderId(
+    providerId: string,
+    pagination: { page: number; pageSize: number },
+    statuses?: JobStatus[],
+  ) {
+    const { page, pageSize } = PaginationHelper.normalize(pagination);
+    const skip = PaginationHelper.calculateSkip(page, pageSize);
+
+    const resolvedStatuses: string[] =
+      statuses && statuses.length > 0
+        ? statuses
+        : [JobStatus.COMPLETED, JobStatus.DISPUTED, JobStatus.CANCELLED];
+
+    const [jobs, total] = await Promise.all([
+      this.jobRepository.findManyByAssignedProvider(
+        providerId,
+        resolvedStatuses,
+        skip,
+        pageSize,
+      ),
+      this.jobRepository.countByAssignedProvider(providerId, resolvedStatuses),
+    ]);
+
+    return PaginationHelper.buildResponse(jobs, total, page, pageSize);
+  }
 }
