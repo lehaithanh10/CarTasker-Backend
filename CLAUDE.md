@@ -234,7 +234,7 @@ npm run seed             # seed service categories
 | `POST` | `/jobs/:jobId/complete` | Customer | Shortcut: `ASSIGNED or AWAITING_… → COMPLETED` |
 | `POST` | `/jobs/:jobId/dispute` | Customer | `AWAITING_… → DISPUTED` — body `{ reason: string }` |
 | `GET` | `/jobs/customer/:customerId` | Public | Paginated jobs for a customer |
-| `GET` | `/jobs/provider/:providerId` | Public | Paginated job history for a provider. Defaults to `completed,disputed,cancelled`. Pass `?status=completed,disputed,assigned` to customise. |
+| `GET` | `/jobs/provider/:providerId` | Public | Paginated job history for a provider. Defaults to all statuses except `open`. Pass `?status=completed,disputed` to narrow. |
 
 ### Bids
 | Method | Path | Auth | Notes |

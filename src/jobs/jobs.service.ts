@@ -315,7 +315,13 @@ export class JobsService {
     const resolvedStatuses: string[] =
       statuses && statuses.length > 0
         ? statuses
-        : [JobStatus.COMPLETED, JobStatus.DISPUTED, JobStatus.CANCELLED];
+        : [
+            JobStatus.ASSIGNED,
+            JobStatus.AWAITING_CUSTOMER_CONFIRMATION,
+            JobStatus.COMPLETED,
+            JobStatus.DISPUTED,
+            JobStatus.CANCELLED,
+          ];
 
     const [jobs, total] = await Promise.all([
       this.jobRepository.findManyByAssignedProvider(
