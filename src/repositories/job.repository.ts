@@ -154,6 +154,46 @@ export class JobRepository extends BaseRepository<Job, CreateJobInput, UpdateJob
     });
   }
 
+  // ─── Provider history ─────────────────────────────────────────────────────
+
+  /**
+   * Returns paginated jobs where the given user is the assigned provider,
+   * optionally filtered by one or more statuses (defaults to all statuses).
+   */
+  async findManyByAssignedProvider(
+    providerId: string,
+    statuses: string[],
+    skip: number,
+    take: number,
+  ) {
+    return this.prisma.job.findMany({
+      where: {
+        assignedProviderId: providerId,
+        ...(statuses.length > 0 ? { status: { in: statuses } } : {}),
+      },
+      include: {
+        category: { select: { id: true, name: true, slug: true } },
+        customer: { select: { id: true, fullName: true, avatarUrl: true } },
+        bids: { select: { id: true } },
+      },
+      skip,
+      take,
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
+  async countByAssignedProvider(
+    providerId: string,
+    statuses: string[],
+  ): Promise<number> {
+    return this.prisma.job.count({
+      where: {
+        assignedProviderId: providerId,
+        ...(statuses.length > 0 ? { status: { in: statuses } } : {}),
+      },
+    });
+  }
+
   // ─── Completion flow ──────────────────────────────────────────────────────
 
   /**

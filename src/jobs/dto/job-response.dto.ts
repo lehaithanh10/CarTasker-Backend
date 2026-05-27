@@ -37,6 +37,9 @@ export class UnifiedJobResponseDto {
   status: string;
 
   @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty()
   category: CategoryDto;
 }
 

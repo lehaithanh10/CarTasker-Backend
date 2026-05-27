@@ -189,4 +189,39 @@ export class JobsController {
 
     return JobMapper.mapJobsToUnifiedList(response.data, response.pagination);
   }
+
+  // ─── Provider-scoped job history ────────────────────────────────────────────
+
+  /**
+   * Returns jobs where the given provider is the assigned provider.
+   * Defaults to completed + disputed + cancelled (history) when no ?status is given.
+   * Pass ?status=completed,disputed,cancelled,assigned to customise the filter.
+   */
+  @Get('provider/:providerId')
+  @ApiOperation({ summary: 'Get job history for a specific provider' })
+  @ApiQuery({ name: 'status', required: false, type: String, description: 'Comma-separated JobStatus values, e.g. completed,disputed' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'pageSize', required: false, type: Number, example: 20 })
+  @ApiResponse({ status: 200, type: UnifiedJobListResponseDto })
+  async getProviderJobs(
+    @Param('providerId') providerId: string,
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    const statuses = status
+      ? (status.split(',').map((s) => s.trim()) as any[])
+      : undefined;
+
+    const response = await this.jobsService.getJobsByAssignedProviderId(
+      providerId,
+      {
+        page: page ? parseInt(page) : 1,
+        pageSize: pageSize ? parseInt(pageSize) : 20,
+      },
+      statuses,
+    );
+
+    return JobMapper.mapJobsToUnifiedList(response.data, response.pagination);
+  }
 }
