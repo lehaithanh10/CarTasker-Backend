@@ -16,6 +16,7 @@ import {
   DateHelper,
 } from '@/common/helpers';
 import { JobEventsPublisher } from '@/common/services/job-events.publisher';
+import { JobMapper } from './mappers/job.mapper';
 
 interface JobListFilters {
   status?: string;
@@ -65,6 +66,11 @@ export class JobsService {
 
     const bidsCount = await this.bidRepository.countPendingByJob(jobId);
 
+    // Unauthenticated request → return scrubbed public shape (no PII, no bid data).
+    if (!currentUserId) {
+      return JobMapper.toPublicDetail({ ...job, bidsCount });
+    }
+
     const response: any = {
       id: job.id,
       title: job.title,
@@ -82,7 +88,7 @@ export class JobsService {
       bidsCount,
     };
 
-    if (currentUserRole === UserRole.PROVIDER && currentUserId) {
+    if (currentUserRole === UserRole.PROVIDER) {
       const [otherBidsCount, lowestBidAmount, myBid] = await Promise.all([
         this.bidRepository.countPendingByJobExcludingProvider(jobId, currentUserId),
         this.bidRepository.findLowestPendingByJobExcludingProvider(jobId, currentUserId),

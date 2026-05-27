@@ -23,6 +23,28 @@ export class JobMapper {
     };
   }
 
+  /**
+   * Safe subset for unauthenticated public requests.
+   * Omits: locationText (may contain street address), customerId, customer
+   * (PII), assignedProviderId, and all bid-specific fields.
+   */
+  static toPublicDetail(job: any) {
+    return {
+      id: job.id,
+      title: job.title,
+      description: job.description,
+      suburb: job.suburb,
+      state: job.state,
+      preferredDate: job.preferredDate,
+      status: job.status,
+      category: job.category
+        ? { id: job.category.id, name: job.category.name }
+        : null,
+      bidsCount: job.bidsCount ?? 0,
+      createdAt: job.createdAt,
+    };
+  }
+
   static mapJobsToUnifiedList(
     rawJobs: any[],
     pagination: {
