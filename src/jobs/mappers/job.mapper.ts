@@ -38,9 +38,7 @@ export class JobMapper {
       state: job.state,
       preferredDate: job.preferredDate,
       status: job.status,
-      category: job.category
-        ? { id: job.category.id, name: job.category.name }
-        : null,
+      category: job.category ? { id: job.category.id, name: job.category.name } : null,
       bidsCount: job.bidsCount ?? 0,
       createdAt: job.createdAt,
     };

@@ -1,10 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ProviderRepository } from '@/repositories/provider.repository';
 import { UserRepository } from '@/repositories/user.repository';
-import {
-  CreateProviderProfileDto,
-  UpdateProviderProfileDto,
-} from './dto/provider.dto';
+import { CreateProviderProfileDto, UpdateProviderProfileDto } from './dto/provider.dto';
 
 @Injectable()
 export class ProvidersService {
@@ -13,10 +10,7 @@ export class ProvidersService {
     private userRepository: UserRepository,
   ) {}
 
-  async createOrUpdateProfile(
-    userId: string,
-    createProfileDto: CreateProviderProfileDto,
-  ) {
+  async createOrUpdateProfile(userId: string, createProfileDto: CreateProviderProfileDto) {
     const existingProfile = await this.providerRepository.findUnique({ userId });
 
     if (existingProfile) {
@@ -29,10 +23,7 @@ export class ProvidersService {
     });
   }
 
-  async updateProfile(
-    userId: string,
-    updateProfileDto: UpdateProviderProfileDto,
-  ) {
+  async updateProfile(userId: string, updateProfileDto: UpdateProviderProfileDto) {
     await this.providerRepository.findByOrThrow({ userId }, 'Provider profile');
     return this.providerRepository.update({ userId }, updateProfileDto);
   }

@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Body,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { BidsService } from './bids.service';
 import { CreateJobBidDto, UpdateJobBidDto } from './dto/bid.dto';
@@ -37,10 +29,7 @@ export class BidsController {
   @Roles(UserRole.CUSTOMER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all bids for a job' })
-  async getBidsForJob(
-    @Param('jobId') jobId: string,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
+  async getBidsForJob(@Param('jobId') jobId: string, @CurrentUser() user: CurrentUserPayload) {
     return this.bidsService.getBidsForJob(jobId, user.userId);
   }
 }
@@ -54,10 +43,8 @@ export class BidActionsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.PROVIDER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get provider\'s bids' })
-  async getMyBids(
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
+  @ApiOperation({ summary: "Get provider's bids" })
+  async getMyBids(@CurrentUser() user: CurrentUserPayload) {
     return this.bidsService.getProviderBids(user.userId);
   }
 
@@ -79,10 +66,7 @@ export class BidActionsController {
   @Roles(UserRole.PROVIDER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Withdraw a bid' })
-  async withdrawBid(
-    @Param('bidId') bidId: string,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
+  async withdrawBid(@Param('bidId') bidId: string, @CurrentUser() user: CurrentUserPayload) {
     return this.bidsService.withdrawBid(bidId, user.userId);
   }
 
@@ -91,10 +75,7 @@ export class BidActionsController {
   @Roles(UserRole.CUSTOMER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Accept a bid' })
-  async acceptBid(
-    @Param('bidId') bidId: string,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
+  async acceptBid(@Param('bidId') bidId: string, @CurrentUser() user: CurrentUserPayload) {
     const bid = await this.bidsService.getBid(bidId);
     return this.bidsService.acceptBid(bid.jobId, bidId, user.userId);
   }
@@ -104,10 +85,7 @@ export class BidActionsController {
   @Roles(UserRole.CUSTOMER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Reject a bid' })
-  async rejectBid(
-    @Param('bidId') bidId: string,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
+  async rejectBid(@Param('bidId') bidId: string, @CurrentUser() user: CurrentUserPayload) {
     return this.bidsService.rejectBid(bidId, user.userId);
   }
 }

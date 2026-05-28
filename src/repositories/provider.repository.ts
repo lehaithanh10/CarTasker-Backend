@@ -39,7 +39,11 @@ export interface UpdateProviderProfileInput {
 }
 
 @Injectable()
-export class ProviderRepository extends BaseRepository<ProviderProfile, CreateProviderProfileInput, UpdateProviderProfileInput> {
+export class ProviderRepository extends BaseRepository<
+  ProviderProfile,
+  CreateProviderProfileInput,
+  UpdateProviderProfileInput
+> {
   protected readonly modelName = 'providerProfile';
 
   constructor(@Inject(ORM_ADAPTER_TOKEN) ormAdapter: ORMAdapter) {

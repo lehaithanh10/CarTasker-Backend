@@ -3,10 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UserRepository, User } from '@/repositories/user.repository';
 import { RegisterDto, LoginDto, AuthResponseDto } from './dto/auth.dto';
-import {
-  UserAlreadyExistsException,
-  InvalidCredentialsException,
-} from '@/common/exceptions';
+import { UserAlreadyExistsException, InvalidCredentialsException } from '@/common/exceptions';
 import { PasswordService } from '@/common/services/password.service';
 import { UserMapper } from '@/users/mappers/user.mapper';
 
@@ -89,10 +86,10 @@ export class AuthService {
   }
 
   private signToken(user: User, expiresIn: string): string {
-    return this.jwtService.sign(
-      { email: user.email, role: user.role },
-      { subject: user.id, expiresIn } as any,
-    );
+    return this.jwtService.sign({ email: user.email, role: user.role }, {
+      subject: user.id,
+      expiresIn,
+    } as any);
   }
 
   private getTtl(key: string, fallback: string): string {

@@ -15,17 +15,16 @@ export class DashboardService {
   ) {}
 
   async getCustomerDashboard(customerId: string): Promise<CustomerDashboardDto> {
-    const [openJobsCount, assignedJobsCount, completedJobsCount, openJobs] =
-      await Promise.all([
-        this.jobRepository.countByCustomerAndStatus(customerId, JobStatus.OPEN),
-        this.jobRepository.countByCustomerAndStatus(customerId, JobStatus.ASSIGNED),
-        this.jobRepository.countByCustomerAndStatus(customerId, JobStatus.COMPLETED),
-        this.jobRepository.findRecentByCustomerAndStatus(
-          customerId,
-          JobStatus.OPEN,
-          RECENT_ITEMS_LIMIT,
-        ),
-      ]);
+    const [openJobsCount, assignedJobsCount, completedJobsCount, openJobs] = await Promise.all([
+      this.jobRepository.countByCustomerAndStatus(customerId, JobStatus.OPEN),
+      this.jobRepository.countByCustomerAndStatus(customerId, JobStatus.ASSIGNED),
+      this.jobRepository.countByCustomerAndStatus(customerId, JobStatus.COMPLETED),
+      this.jobRepository.findRecentByCustomerAndStatus(
+        customerId,
+        JobStatus.OPEN,
+        RECENT_ITEMS_LIMIT,
+      ),
+    ]);
 
     return {
       openJobsCount,

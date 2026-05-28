@@ -62,8 +62,7 @@ async function bootstrap() {
   // surface to scanners.  Set SWAGGER_ENABLED=true in staging Fly secrets if you
   // want to browse it there (it's off by default in production).
   const swaggerEnabled =
-    process.env.NODE_ENV !== 'production' ||
-    process.env.SWAGGER_ENABLED === 'true';
+    process.env.NODE_ENV !== 'production' || process.env.SWAGGER_ENABLED === 'true';
 
   if (swaggerEnabled) {
     const config = new DocumentBuilder()

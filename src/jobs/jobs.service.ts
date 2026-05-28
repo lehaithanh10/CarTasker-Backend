@@ -4,10 +4,7 @@ import { JobRepository } from '@/repositories/job.repository';
 import { CategoryRepository } from '@/repositories/category.repository';
 import { BidRepository } from '@/repositories/bid.repository';
 import { CreateJobDto, UpdateJobDto } from './dto/job.dto';
-import {
-  ResourceNotFoundException,
-  UnauthorizedActionException,
-} from '@/common/exceptions';
+import { ResourceNotFoundException, UnauthorizedActionException } from '@/common/exceptions';
 import { JobStatus, UserRole } from '@/common/enums';
 import {
   PaginationHelper,
@@ -39,10 +36,7 @@ export class JobsService {
   ) {}
 
   async createJob(customerId: string, createJobDto: CreateJobDto) {
-    await this.categoryRepository.findByIdOrThrow(
-      createJobDto.categoryId,
-      'Service category',
-    );
+    await this.categoryRepository.findByIdOrThrow(createJobDto.categoryId, 'Service category');
 
     return this.jobRepository.create({
       customerId,
@@ -207,8 +201,7 @@ export class JobsService {
       'Job must be assigned or awaiting confirmation to be completed',
     );
 
-    const source =
-      job.status === JobStatus.ASSIGNED ? 'customer-shortcut' : 'customer';
+    const source = job.status === JobStatus.ASSIGNED ? 'customer-shortcut' : 'customer';
 
     const updated = await this.jobRepository.confirmCompletionWithTransaction(
       jobId,
@@ -241,11 +234,7 @@ export class JobsService {
       'A dispute can only be raised while the job is awaiting confirmation',
     );
 
-    const updated = await this.jobRepository.disputeWithTransaction(
-      jobId,
-      customerId,
-      reason,
-    );
+    const updated = await this.jobRepository.disputeWithTransaction(jobId, customerId, reason);
 
     await this.jobEvents.publish({
       type: 'job.disputed',
@@ -289,10 +278,7 @@ export class JobsService {
     }
   }
 
-  async getJobsByCustomerId(
-    customerId: string,
-    pagination: { page: number; pageSize: number },
-  ) {
+  async getJobsByCustomerId(customerId: string, pagination: { page: number; pageSize: number }) {
     const { page, pageSize } = PaginationHelper.normalize(pagination);
     const skip = PaginationHelper.calculateSkip(page, pageSize);
 
@@ -330,12 +316,7 @@ export class JobsService {
           ];
 
     const [jobs, total] = await Promise.all([
-      this.jobRepository.findManyByAssignedProvider(
-        providerId,
-        resolvedStatuses,
-        skip,
-        pageSize,
-      ),
+      this.jobRepository.findManyByAssignedProvider(providerId, resolvedStatuses, skip, pageSize),
       this.jobRepository.countByAssignedProvider(providerId, resolvedStatuses),
     ]);
 

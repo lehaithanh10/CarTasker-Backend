@@ -6,10 +6,7 @@ import { CompletionAutoReleaseScheduler } from './completion-auto-release.schedu
 import { RepositoriesModule } from '@/repositories/repositories.module';
 
 @Module({
-  imports: [
-    RepositoriesModule,
-    ScheduleModule.forRoot(),
-  ],
+  imports: [RepositoriesModule, ScheduleModule.forRoot()],
   providers: [JobsService, CompletionAutoReleaseScheduler],
   controllers: [JobsController],
   exports: [JobsService],

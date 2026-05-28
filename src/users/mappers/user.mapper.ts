@@ -28,11 +28,7 @@ export class UserMapper {
     };
   }
 
-  static toAuthResponse(
-    user: User,
-    accessToken: string,
-    refreshToken: string,
-  ): AuthResponseDto {
+  static toAuthResponse(user: User, accessToken: string, refreshToken: string): AuthResponseDto {
     return {
       accessToken,
       refreshToken,

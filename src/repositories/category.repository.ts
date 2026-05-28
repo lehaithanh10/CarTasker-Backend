@@ -24,7 +24,11 @@ export interface UpdateServiceCategoryInput {
 }
 
 @Injectable()
-export class CategoryRepository extends BaseRepository<ServiceCategory, CreateServiceCategoryInput, UpdateServiceCategoryInput> {
+export class CategoryRepository extends BaseRepository<
+  ServiceCategory,
+  CreateServiceCategoryInput,
+  UpdateServiceCategoryInput
+> {
   protected readonly modelName = 'serviceCategory';
 
   constructor(@Inject(ORM_ADAPTER_TOKEN) ormAdapter: ORMAdapter) {

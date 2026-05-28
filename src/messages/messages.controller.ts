@@ -1,18 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { MessagesService } from './messages.service';
 import { CreateMessageDto, CreateConversationDto } from './dto';
 import { JwtAuthGuard } from '@/common/guards';
@@ -31,11 +18,7 @@ export class MessagesController {
     @CurrentUser() user: CurrentUserPayload,
     @Body() dto: CreateConversationDto,
   ) {
-    return this.messagesService.getOrCreateConversation(
-      user.userId,
-      dto.jobId,
-      dto.recipientId,
-    );
+    return this.messagesService.getOrCreateConversation(user.userId, dto.jobId, dto.recipientId);
   }
 
   @Get()
@@ -72,15 +55,11 @@ export class MessagesController {
     @Query('before') before?: string,
     @Query('after') after?: string,
   ) {
-    return this.messagesService.getConversationMessages(
-      conversationId,
-      user.userId,
-      {
-        limit: limit ? parseInt(limit, 10) : undefined,
-        before,
-        after,
-      },
-    );
+    return this.messagesService.getConversationMessages(conversationId, user.userId, {
+      limit: limit ? parseInt(limit, 10) : undefined,
+      before,
+      after,
+    });
   }
 
   @Post(':conversationId/messages')

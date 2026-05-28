@@ -136,11 +136,7 @@ export class JobRepository extends BaseRepository<Job, CreateJobInput, UpdateJob
     return this.prisma.jobAssignment.count({ where: { providerId } });
   }
 
-  async findRecentByCustomerAndStatus(
-    customerId: string,
-    status: string,
-    limit: number,
-  ) {
+  async findRecentByCustomerAndStatus(customerId: string, status: string, limit: number) {
     return this.prisma.job.findMany({
       where: { customerId, status },
       select: {
@@ -182,10 +178,7 @@ export class JobRepository extends BaseRepository<Job, CreateJobInput, UpdateJob
     });
   }
 
-  async countByAssignedProvider(
-    providerId: string,
-    statuses: string[],
-  ): Promise<number> {
+  async countByAssignedProvider(providerId: string, statuses: string[]): Promise<number> {
     return this.prisma.job.count({
       where: {
         assignedProviderId: providerId,
@@ -200,11 +193,7 @@ export class JobRepository extends BaseRepository<Job, CreateJobInput, UpdateJob
    * Provider requests completion: ASSIGNED → AWAITING_CUSTOMER_CONFIRMATION.
    * Sets the auto-release deadline on JobAssignment.
    */
-  async requestCompletionWithTransaction(
-    jobId: string,
-    providerId: string,
-    autoReleaseAt: Date,
-  ) {
+  async requestCompletionWithTransaction(jobId: string, providerId: string, autoReleaseAt: Date) {
     return this.prisma.$transaction(async (tx: any) => {
       const updatedJob = await tx.job.update({
         where: { id: jobId },
@@ -273,11 +262,7 @@ export class JobRepository extends BaseRepository<Job, CreateJobInput, UpdateJob
   /**
    * Customer disputes completion: AWAITING_CUSTOMER_CONFIRMATION → DISPUTED.
    */
-  async disputeWithTransaction(
-    jobId: string,
-    customerId: string,
-    reason: string,
-  ) {
+  async disputeWithTransaction(jobId: string, customerId: string, reason: string) {
     return this.prisma.$transaction(async (tx: any) => {
       const updatedJob = await tx.job.update({
         where: { id: jobId },

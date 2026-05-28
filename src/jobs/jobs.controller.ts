@@ -1,16 +1,12 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Body,
-  Param,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { JobsService } from './jobs.service';
-import { CreateJobDto, UpdateJobDto, UnifiedJobListResponseDto, DisputeJobDto } from './dto/job.dto';
+import {
+  CreateJobDto,
+  UpdateJobDto,
+  UnifiedJobListResponseDto,
+  DisputeJobDto,
+} from './dto/job.dto';
 import { JobMapper } from './mappers/job.mapper';
 import { JwtAuthGuard, OptionalJwtAuthGuard, RolesGuard } from '@/common/guards';
 import { CurrentUser, CurrentUserPayload, Roles } from '@/common/decorators';
@@ -26,10 +22,7 @@ export class JobsController {
   @Roles(UserRole.CUSTOMER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new job' })
-  async createJob(
-    @CurrentUser() user: CurrentUserPayload,
-    @Body() createJobDto: CreateJobDto,
-  ) {
+  async createJob(@CurrentUser() user: CurrentUserPayload, @Body() createJobDto: CreateJobDto) {
     return this.jobsService.createJob(user.userId, createJobDto);
   }
 
@@ -67,11 +60,11 @@ export class JobsController {
 
   @Get(':jobId')
   @UseGuards(OptionalJwtAuthGuard)
-  @ApiOperation({ summary: 'Get job details. Unauthenticated requests receive a scrubbed public response (no customer PII, no bid data).' })
-  async getJob(
-    @Param('jobId') jobId: string,
-    @CurrentUser() user?: CurrentUserPayload,
-  ) {
+  @ApiOperation({
+    summary:
+      'Get job details. Unauthenticated requests receive a scrubbed public response (no customer PII, no bid data).',
+  })
+  async getJob(@Param('jobId') jobId: string, @CurrentUser() user?: CurrentUserPayload) {
     return this.jobsService.getJobById(jobId, user?.userId, user?.role);
   }
 
@@ -93,10 +86,7 @@ export class JobsController {
   @Roles(UserRole.CUSTOMER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Cancel a job' })
-  async cancelJob(
-    @Param('jobId') jobId: string,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
+  async cancelJob(@Param('jobId') jobId: string, @CurrentUser() user: CurrentUserPayload) {
     return this.jobsService.cancelJob(jobId, user.userId);
   }
 
@@ -111,11 +101,10 @@ export class JobsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.PROVIDER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Provider requests job completion (ASSIGNED → AWAITING_CUSTOMER_CONFIRMATION)' })
-  async requestCompletion(
-    @Param('jobId') jobId: string,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
+  @ApiOperation({
+    summary: 'Provider requests job completion (ASSIGNED → AWAITING_CUSTOMER_CONFIRMATION)',
+  })
+  async requestCompletion(@Param('jobId') jobId: string, @CurrentUser() user: CurrentUserPayload) {
     return this.jobsService.requestCompletion(jobId, user.userId);
   }
 
@@ -127,11 +116,10 @@ export class JobsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.CUSTOMER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Customer confirms job completion (AWAITING_CUSTOMER_CONFIRMATION → COMPLETED)' })
-  async confirmCompletion(
-    @Param('jobId') jobId: string,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
+  @ApiOperation({
+    summary: 'Customer confirms job completion (AWAITING_CUSTOMER_CONFIRMATION → COMPLETED)',
+  })
+  async confirmCompletion(@Param('jobId') jobId: string, @CurrentUser() user: CurrentUserPayload) {
     return this.jobsService.confirmCompletion(jobId, user.userId);
   }
 
@@ -145,11 +133,11 @@ export class JobsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.CUSTOMER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Customer marks job complete (shortcut — works from ASSIGNED or AWAITING_CUSTOMER_CONFIRMATION)' })
-  async completeJob(
-    @Param('jobId') jobId: string,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
+  @ApiOperation({
+    summary:
+      'Customer marks job complete (shortcut — works from ASSIGNED or AWAITING_CUSTOMER_CONFIRMATION)',
+  })
+  async completeJob(@Param('jobId') jobId: string, @CurrentUser() user: CurrentUserPayload) {
     return this.jobsService.confirmCompletion(jobId, user.userId);
   }
 
@@ -161,7 +149,9 @@ export class JobsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.CUSTOMER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Customer disputes job completion (AWAITING_CUSTOMER_CONFIRMATION → DISPUTED)' })
+  @ApiOperation({
+    summary: 'Customer disputes job completion (AWAITING_CUSTOMER_CONFIRMATION → DISPUTED)',
+  })
   async disputeCompletion(
     @Param('jobId') jobId: string,
     @CurrentUser() user: CurrentUserPayload,
@@ -199,7 +189,12 @@ export class JobsController {
    */
   @Get('provider/:providerId')
   @ApiOperation({ summary: 'Get job history for a specific provider' })
-  @ApiQuery({ name: 'status', required: false, type: String, description: 'Comma-separated JobStatus values, e.g. completed,disputed' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    type: String,
+    description: 'Comma-separated JobStatus values, e.g. completed,disputed',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'pageSize', required: false, type: Number, example: 20 })
   @ApiResponse({ status: 200, type: UnifiedJobListResponseDto })
@@ -209,9 +204,7 @@ export class JobsController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
-    const statuses = status
-      ? (status.split(',').map((s) => s.trim()) as any[])
-      : undefined;
+    const statuses = status ? (status.split(',').map((s) => s.trim()) as any[]) : undefined;
 
     const response = await this.jobsService.getJobsByAssignedProviderId(
       providerId,

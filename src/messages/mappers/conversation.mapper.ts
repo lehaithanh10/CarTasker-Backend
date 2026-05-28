@@ -38,12 +38,8 @@ export class ConversationMapper {
    * Map a single conversation row to a `ConversationListItem`.
    * `viewerUserId` selects which side of the conversation is "the other user".
    */
-  static toListItem(
-    row: ConversationRowWithRelations,
-    viewerUserId: string,
-  ): ConversationListItem {
-    const otherUser =
-      row.customerId === viewerUserId ? row.provider : row.customer;
+  static toListItem(row: ConversationRowWithRelations, viewerUserId: string): ConversationListItem {
+    const otherUser = row.customerId === viewerUserId ? row.provider : row.customer;
     const lastMsg = row.messages[0] ?? null;
 
     return {

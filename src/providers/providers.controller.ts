@@ -1,18 +1,7 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Patch,
-  Body,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { ProvidersService } from './providers.service';
-import {
-  CreateProviderProfileDto,
-  UpdateProviderProfileDto,
-} from './dto/provider.dto';
+import { CreateProviderProfileDto, UpdateProviderProfileDto } from './dto/provider.dto';
 import { JwtAuthGuard, RolesGuard } from '@/common/guards';
 import { CurrentUser, CurrentUserPayload, Roles } from '@/common/decorators';
 import { UserRole } from '@/common/enums';

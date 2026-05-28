@@ -11,11 +11,7 @@ import {
   // ProviderProfileRequiredException,
 } from '@/common/exceptions';
 import { BidStatus, JobStatus } from '@/common/enums';
-import {
-  PaginationHelper,
-  AuthorizationHelper,
-  StatusValidator,
-} from '@/common/helpers';
+import { PaginationHelper, AuthorizationHelper, StatusValidator } from '@/common/helpers';
 
 interface BidPaginationFilters {
   page?: number;
@@ -62,12 +58,7 @@ export class BidsService {
   async getBidsForJob(jobId: string, customerId: string) {
     const job = await this.jobRepository.findByIdOrThrow(jobId, 'Job');
 
-    AuthorizationHelper.ensureOwner(
-      job,
-      customerId,
-      'customerId',
-      'Only job owner can view bids',
-    );
+    AuthorizationHelper.ensureOwner(job, customerId, 'customerId', 'Only job owner can view bids');
 
     return this.bidRepository.findManyByJobWithProvider(jobId);
   }
@@ -76,18 +67,10 @@ export class BidsService {
     const bid = await this.bidRepository.findByIdOrThrow(bidId, 'Bid');
 
     AuthorizationHelper.ensureOwner(bid, providerId, 'providerId');
-    StatusValidator.requireStatus(
-      bid,
-      BidStatus.PENDING,
-      'Only pending bids can be updated',
-    );
+    StatusValidator.requireStatus(bid, BidStatus.PENDING, 'Only pending bids can be updated');
 
     const job = await this.jobRepository.findByIdOrThrow(bid.jobId, 'Job');
-    StatusValidator.requireStatus(
-      job,
-      JobStatus.OPEN,
-      'Job is not open for bid updates',
-    );
+    StatusValidator.requireStatus(job, JobStatus.OPEN, 'Job is not open for bid updates');
 
     return this.bidRepository.update({ id: bidId }, updateBidDto);
   }
@@ -96,11 +79,7 @@ export class BidsService {
     const bid = await this.bidRepository.findByIdOrThrow(bidId, 'Bid');
 
     AuthorizationHelper.ensureOwner(bid, providerId, 'providerId');
-    StatusValidator.requireStatus(
-      bid,
-      BidStatus.PENDING,
-      'Only pending bids can be withdrawn',
-    );
+    StatusValidator.requireStatus(bid, BidStatus.PENDING, 'Only pending bids can be withdrawn');
 
     return this.bidRepository.delete({ id: bidId });
   }
@@ -120,16 +99,8 @@ export class BidsService {
       throw new UnauthorizedActionException('Bid does not belong to this job');
     }
 
-    StatusValidator.requireStatus(
-      bid,
-      BidStatus.PENDING,
-      'Only pending bids can be accepted',
-    );
-    StatusValidator.requireStatus(
-      job,
-      JobStatus.OPEN,
-      'Job is not open for bid acceptance',
-    );
+    StatusValidator.requireStatus(bid, BidStatus.PENDING, 'Only pending bids can be accepted');
+    StatusValidator.requireStatus(job, JobStatus.OPEN, 'Job is not open for bid acceptance');
 
     return this.bidRepository.acceptBidWithTransaction(
       bidId,
@@ -151,11 +122,7 @@ export class BidsService {
       throw new UnauthorizedActionException('Only job owner can reject bids');
     }
 
-    StatusValidator.requireStatus(
-      bid,
-      BidStatus.PENDING,
-      'Only pending bids can be rejected',
-    );
+    StatusValidator.requireStatus(bid, BidStatus.PENDING, 'Only pending bids can be rejected');
 
     return this.bidRepository.update({ id: bidId }, { status: BidStatus.REJECTED });
   }

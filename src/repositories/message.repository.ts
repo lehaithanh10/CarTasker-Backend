@@ -25,7 +25,11 @@ export interface UpdateMessageInput {
 }
 
 @Injectable()
-export class MessageRepository extends BaseRepository<Message, CreateMessageInput, UpdateMessageInput> {
+export class MessageRepository extends BaseRepository<
+  Message,
+  CreateMessageInput,
+  UpdateMessageInput
+> {
   protected readonly modelName = 'message';
 
   constructor(@Inject(ORM_ADAPTER_TOKEN) ormAdapter: ORMAdapter) {

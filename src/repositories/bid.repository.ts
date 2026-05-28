@@ -52,7 +52,13 @@ export class BidRepository extends BaseRepository<JobBid, CreateJobBidInput, Upd
     });
   }
 
-  async acceptBidWithTransaction(bidId: string, jobId: string, providerId: string, customerId: string, oldStatus: string) {
+  async acceptBidWithTransaction(
+    bidId: string,
+    jobId: string,
+    providerId: string,
+    customerId: string,
+    oldStatus: string,
+  ) {
     return this.prisma.$transaction(async (tx: any) => {
       const acceptedBid = await tx.jobBid.update({
         where: { id: bidId },
@@ -136,7 +142,7 @@ export class BidRepository extends BaseRepository<JobBid, CreateJobBidInput, Upd
     const total = await this.prisma.jobBid.count({ where: { providerId } });
 
     return {
-      bids: bids.map(bid => ({
+      bids: bids.map((bid) => ({
         id: bid.id,
         jobId: bid.jobId,
         providerId: bid.providerId,

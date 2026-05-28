@@ -4,16 +4,13 @@ import { ConversationRepository } from '@/repositories/conversation.repository';
 import { JobRepository } from '@/repositories/job.repository';
 import { MessagesGateway } from './messages.gateway';
 import { CreateMessageDto } from './dto';
-import {
-  ResourceNotFoundException,
-  UnauthorizedActionException,
-} from '@/common/exceptions';
+import { ResourceNotFoundException, UnauthorizedActionException } from '@/common/exceptions';
 import { AuthorizationHelper } from '@/common/helpers';
 
 export interface GetMessagesQuery {
-  limit?: number;   // default 30, max 100
-  before?: string;  // messageId — return older messages (infinite scroll up)
-  after?: string;   // messageId — return newer messages (gap-fill after reconnect)
+  limit?: number; // default 30, max 100
+  before?: string; // messageId — return older messages (infinite scroll up)
+  after?: string; // messageId — return newer messages (gap-fill after reconnect)
 }
 
 @Injectable()
@@ -27,11 +24,7 @@ export class MessagesService {
 
   // ── Conversations ────────────────────────────────────────────────────────
 
-  async getOrCreateConversation(
-    userId: string,
-    jobId: string,
-    recipientId: string,
-  ) {
+  async getOrCreateConversation(userId: string, jobId: string, recipientId: string) {
     const job = await this.jobRepository.findByIdOrThrow(jobId, 'Job');
 
     const isCustomer = job.customerId === userId;
@@ -46,11 +39,7 @@ export class MessagesService {
     const customerId = isCustomer ? userId : recipientId;
     const providerId = isCustomer ? recipientId : userId;
 
-    return this.conversationRepository.upsertByJobId(
-      jobId,
-      customerId,
-      providerId,
-    );
+    return this.conversationRepository.upsertByJobId(jobId, customerId, providerId);
   }
 
   async getConversations(userId: string) {
@@ -69,14 +58,9 @@ export class MessagesService {
     userId: string,
     query: GetMessagesQuery = {},
   ) {
-    const allowed = await this.conversationRepository.isParticipant(
-      conversationId,
-      userId,
-    );
+    const allowed = await this.conversationRepository.isParticipant(conversationId, userId);
     if (!allowed) {
-      throw new UnauthorizedActionException(
-        'Not a participant in this conversation',
-      );
+      throw new UnauthorizedActionException('Not a participant in this conversation');
     }
 
     const limit = Math.min(query.limit ?? 30, 100);
@@ -121,19 +105,11 @@ export class MessagesService {
     return [...messages].reverse();
   }
 
-  async sendMessage(
-    conversationId: string,
-    userId: string,
-    dto: CreateMessageDto,
-  ) {
-    const conv =
-      await this.conversationRepository.findByIdOrNull(conversationId);
+  async sendMessage(conversationId: string, userId: string, dto: CreateMessageDto) {
+    const conv = await this.conversationRepository.findByIdOrNull(conversationId);
     if (!conv) throw new ResourceNotFoundException('Conversation');
 
-    AuthorizationHelper.ensureOneOfOwners(conv, userId, [
-      'customerId',
-      'providerId',
-    ]);
+    AuthorizationHelper.ensureOneOfOwners(conv, userId, ['customerId', 'providerId']);
 
     const message = await this.messageRepository.create({
       conversationId,
@@ -145,44 +121,30 @@ export class MessagesService {
     // Emit real-time events
     this.gateway.emitNewMessage(conversationId, message);
 
-    const recipientId =
-      conv.customerId === userId ? conv.providerId : conv.customerId;
-    const unreadCount =
-      await this.conversationRepository.countUnreadForUser(recipientId);
+    const recipientId = conv.customerId === userId ? conv.providerId : conv.customerId;
+    const unreadCount = await this.conversationRepository.countUnreadForUser(recipientId);
     this.gateway.emitUnreadChanged(recipientId, unreadCount);
 
     return message;
   }
 
   async markMessageAsRead(messageId: string, userId: string) {
-    const message = await this.messageRepository.findByIdOrThrow(
-      messageId,
-      'Message',
-    );
+    const message = await this.messageRepository.findByIdOrThrow(messageId, 'Message');
 
     // Security: the user must be a participant in this message's conversation.
     // Without this check, any authenticated user could mark another user's
     // messages as read by guessing message IDs — polluting their unread counts.
     const conversationId = (message as { conversationId: string }).conversationId;
-    const allowed = await this.conversationRepository.isParticipant(
-      conversationId,
-      userId,
-    );
+    const allowed = await this.conversationRepository.isParticipant(conversationId, userId);
     if (!allowed) {
-      throw new UnauthorizedActionException(
-        'Not a participant in this conversation',
-      );
+      throw new UnauthorizedActionException('Not a participant in this conversation');
     }
 
-    const updated = await this.messageRepository.update(
-      { id: messageId },
-      { isRead: true },
-    );
+    const updated = await this.messageRepository.update({ id: messageId }, { isRead: true });
 
     // Emit read receipt and refresh unread count for the reader
     this.gateway.emitMessageRead(conversationId, messageId, userId);
-    const newCount =
-      await this.conversationRepository.countUnreadForUser(userId);
+    const newCount = await this.conversationRepository.countUnreadForUser(userId);
     this.gateway.emitUnreadChanged(userId, newCount);
 
     return updated;

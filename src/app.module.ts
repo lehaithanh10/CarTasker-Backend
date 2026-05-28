@@ -25,7 +25,7 @@ import { HealthModule } from './health/health.module';
     ThrottlerModule.forRoot([
       {
         name: 'default',
-        ttl: 60_000,   // milliseconds
+        ttl: 60_000, // milliseconds
         limit: 100,
       },
     ]),
