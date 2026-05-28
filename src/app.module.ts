@@ -1,5 +1,7 @@
 import { Module, ValidationPipe, BadRequestException } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ProvidersModule } from './providers/providers.module';
@@ -10,6 +12,7 @@ import { MessagesModule } from './messages/messages.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { CommonModule } from './common/common.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -17,8 +20,18 @@ import { CommonModule } from './common/common.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    // Rate limiting — 100 req/60s per IP by default.
+    // Auth routes override this to 20 req/60s via @Throttle() on AuthController.
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60_000,   // milliseconds
+        limit: 100,
+      },
+    ]),
     CommonModule,
     PrismaModule,
+    HealthModule,
     AuthModule,
     UsersModule,
     ProvidersModule,
@@ -29,6 +42,12 @@ import { CommonModule } from './common/common.module';
     DashboardModule,
   ],
   providers: [
+    // Apply ThrottlerGuard globally so every route is rate-limited.
+    // Individual controllers/handlers can override via @Throttle() or @SkipThrottle().
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: 'APP_PIPE',
       useValue: new ValidationPipe({

@@ -8,11 +8,16 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto, AuthResponseDto, RefreshTokenDto } from './dto/auth.dto';
 import { JwtAuthGuard } from '@/common/guards';
 import { CurrentUser, CurrentUserPayload } from '@/common/decorators';
 
+// Auth routes are high-value brute-force targets.  Override the global 100 req/min
+// limit with a stricter 20 req/min.  The @Get('me') route is exempted via its own
+// @SkipThrottle() — it doesn't need brute-force protection because it requires a valid JWT.
+@Throttle({ default: { ttl: 60_000, limit: 20 } })
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -67,6 +72,7 @@ export class AuthController {
   }
 
   @Get('me')
+  @SkipThrottle()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user' })

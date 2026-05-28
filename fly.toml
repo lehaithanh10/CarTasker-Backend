@@ -1,0 +1,57 @@
+# Fly.io configuration — STAGING
+#
+# Deploy:    flyctl deploy --config fly.toml --remote-only
+# Status:    flyctl status -a cartaskers-be-staging
+# Logs:      flyctl logs -a cartaskers-be-staging
+# Secrets:   flyctl secrets list -a cartaskers-be-staging
+#
+# Production uses fly.prod.toml — keep both in sync structurally,
+# only diverge on app name, scaling, and APP_ENV.
+
+app            = "cartaskers-be-staging"
+primary_region = "syd"
+kill_signal    = "SIGTERM"
+kill_timeout   = "30s"   # give NestJS time to drain in-flight requests + WS connections
+
+[build]
+  dockerfile = "Dockerfile"
+
+[deploy]
+  # Runs in a one-off VM before traffic is shifted. If it exits non-zero,
+  # the deploy is aborted and the old version keeps serving traffic.
+  release_command = "npx prisma migrate deploy"
+  strategy        = "rolling"
+
+[env]
+  PORT     = "8000"
+  NODE_ENV = "production"   # runtime mode, not env label — see APP_ENV
+  APP_ENV  = "staging"      # env label used by logs / Sentry / feature gates
+
+[http_service]
+  internal_port       = 8000
+  force_https         = true
+  # min_machines_running keeps at least one VM live so Socket.IO sessions
+  # aren't dropped by Fly's auto-stop behaviour.
+  auto_stop_machines  = "off"
+  auto_start_machines = false
+  min_machines_running = 1
+  processes            = ["app"]
+
+  [http_service.concurrency]
+    type       = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+  # HTTP health check — Fly shifts traffic away from machines that fail this.
+  # grace_period covers boot time + Prisma connection pool warm-up.
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval     = "15s"
+    method       = "GET"
+    path         = "/health/ready"
+    timeout      = "5s"
+
+[[vm]]
+  size   = "shared-cpu-1x"
+  memory = "512mb"
+  cpus   = 1

@@ -1,0 +1,51 @@
+# Fly.io configuration — PRODUCTION
+#
+# Deploy:    flyctl deploy --config fly.prod.toml --remote-only
+# Status:    flyctl status -a cartaskers-be-production
+#
+# Mirror of fly.toml; only diverges where prod legitimately needs to.
+
+app            = "cartaskers-be-production"
+primary_region = "syd"
+kill_signal    = "SIGTERM"
+kill_timeout   = "30s"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[deploy]
+  release_command = "npx prisma migrate deploy"
+  strategy        = "rolling"
+
+[env]
+  PORT     = "8000"
+  NODE_ENV = "production"
+  APP_ENV  = "production"
+
+[http_service]
+  internal_port       = 8000
+  force_https         = true
+  auto_stop_machines  = "off"
+  auto_start_machines = false
+  # Two machines for prod — protects against single-VM blips during deploy
+  # and gives Fly's load balancer a backup target.
+  min_machines_running = 2
+  processes            = ["app"]
+
+  [http_service.concurrency]
+    type       = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+  # HTTP health check — identical to staging, separate block required per-file.
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval     = "15s"
+    method       = "GET"
+    path         = "/health/ready"
+    timeout      = "5s"
+
+[[vm]]
+  size   = "shared-cpu-1x"
+  memory = "512mb"
+  cpus   = 1

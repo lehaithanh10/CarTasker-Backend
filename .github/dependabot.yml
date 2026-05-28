@@ -1,0 +1,29 @@
+version: 2
+
+updates:
+  # Keep npm dependencies current.
+  # Auto-merge is intentionally NOT configured here — review patches in a PR,
+  # especially for security packages (helmet, @nestjs/throttler).
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Australia/Sydney"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  # Keep GitHub Actions pinned to current major versions.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Australia/Sydney"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"

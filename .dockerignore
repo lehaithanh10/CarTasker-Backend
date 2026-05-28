@@ -1,0 +1,61 @@
+# Keep the build context small and avoid baking secrets/junk into the image.
+
+# Dependencies (re-installed inside the image)
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs (regenerated)
+dist
+coverage
+.nyc_output
+
+# Local env / secrets — must NOT enter the image
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.idea
+.vscode
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Caches
+.cache
+tmpCodeCache
+
+# VCS — Dockerfile only needs the source tree, not the history
+.git
+.gitignore
+.gitattributes
+
+# CI / docs / infra (not needed at runtime)
+.github
+.claude
+*.md
+docs
+
+# Test stuff (not needed in the runtime image)
+test
+**/*.spec.ts
+**/*.test.ts
+jest.config.*
+
+# Tooling that doesn't belong in the image
+.eslintrc*
+.prettierrc*
+.editorconfig
+
+# Local-only files
+README*.md
+SETUP.md
+GETTING-STARTED.md
+STRUCTURE.md
+FILE-INDEX.md
+API-TESTING.md
+CLAUDE.md

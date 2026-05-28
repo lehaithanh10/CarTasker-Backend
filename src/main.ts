@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import type { ServerOptions } from 'socket.io';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { LoggingInterceptor } from './common/interceptors';
 
@@ -35,6 +36,13 @@ class CorsIoAdapter extends IoAdapter {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // ── Security headers ────────────────────────────────────────────────────────
+  // Helmet adds HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy,
+  // X-DNS-Prefetch-Control, etc.  CSP is intentionally disabled here — the
+  // frontend owns it via next.config.js headers() + a future middleware.ts.
+  app.use(helmet({ contentSecurityPolicy: false }));
+
+  // ── CORS ────────────────────────────────────────────────────────────────────
   const corsOptions = {
     origin: parseCorsOrigins(process.env.CORS_ORIGINS),
     credentials: true,
@@ -49,24 +57,36 @@ async function bootstrap() {
   // Global Logging Interceptor
   app.useGlobalInterceptors(new LoggingInterceptor());
 
-  // Swagger Configuration
-  const config = new DocumentBuilder()
-    .setTitle('CarTasker API')
-    .setDescription('Backend API for CarTasker - Mobile car services marketplace')
-    .setVersion('1.0.0')
-    .addBearerAuth()
-    .addServer('http://localhost:3001', 'Development')
-    .addServer('https://api.cartasker.com', 'Production')
-    .build();
+  // ── Swagger (dev/staging only) ───────────────────────────────────────────────
+  // Never expose the open Swagger UI in production — it reveals the full API
+  // surface to scanners.  Set SWAGGER_ENABLED=true in staging Fly secrets if you
+  // want to browse it there (it's off by default in production).
+  const swaggerEnabled =
+    process.env.NODE_ENV !== 'production' ||
+    process.env.SWAGGER_ENABLED === 'true';
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  if (swaggerEnabled) {
+    const config = new DocumentBuilder()
+      .setTitle('CarTasker API')
+      .setDescription('Backend API for CarTasker - Mobile car services marketplace')
+      .setVersion('1.0.0')
+      .addBearerAuth()
+      .addServer('http://localhost:8000', 'Local')
+      .addServer('https://cartaskers-be-staging.fly.dev', 'Staging')
+      .addServer('https://api.cartaskers.com.au', 'Production')
+      .build();
 
-  const port = process.env.PORT || 3000;
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
+
+  const port = process.env.PORT || 8000;
   await app.listen(port);
 
-  console.log(`✅ Application is running on: http://localhost:${port}`);
-  console.log(`📚 Swagger documentation: http://localhost:${port}/api/docs`);
+  console.log(`Application is running on port ${port}`);
+  if (swaggerEnabled) {
+    console.log(`Swagger docs: http://localhost:${port}/api/docs`);
+  }
 }
 
 bootstrap().catch((err) => {
