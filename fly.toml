@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for cartaskers-be-staging-misty-cherry-7278 on 2026-06-02T02:39:40Z
+# fly.toml app configuration file generated for cartasker-backend on 2026-06-02T03:09:07Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'cartaskers-be-staging-misty-cherry-7278'
+app = 'cartasker-backend'
 primary_region = 'syd'
 kill_signal = 'SIGTERM'
 kill_timeout = '30s'
