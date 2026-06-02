@@ -15,11 +15,13 @@ jobs:
 
   deploy:
     needs: ci
-    environment: staging          # reads FLY_API_TOKEN secret + FLY_APP_NAME / FLY_CONFIG / API_URL vars
+    environment: staging          # reads FLY_API_TOKEN secret from the staging environment
     uses: lehaithanh10/cartaskers-infra/.github/workflows/fly-deploy.yml@v1.0.0
     with:
-      app-name: ${{ vars.FLY_APP_NAME }}
-      fly-config: ${{ vars.FLY_CONFIG }}
-      api-url: ${{ vars.API_URL }}
+      # vars.* context is not available in reusable-workflow `with:` blocks —
+      # even with environment: set. Hard-code the non-sensitive values here.
+      app-name: cartaskers-be-staging
+      fly-config: fly.toml
+      api-url: https://cartaskers-be-staging.fly.dev
     secrets:
       FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
