@@ -2,10 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { MessageRepository } from '@/repositories/message.repository';
 import { ConversationRepository } from '@/repositories/conversation.repository';
 import { JobRepository } from '@/repositories/job.repository';
+import { BidRepository } from '@/repositories/bid.repository';
 import { MessagesGateway } from './messages.gateway';
 import { CreateMessageDto } from './dto';
 import { ResourceNotFoundException, UnauthorizedActionException } from '@/common/exceptions';
 import { AuthorizationHelper } from '@/common/helpers';
+import { BidStatus } from '@/common/enums';
 
 export interface GetMessagesQuery {
   limit?: number; // default 30, max 100
@@ -19,6 +21,7 @@ export class MessagesService {
     private messageRepository: MessageRepository,
     private conversationRepository: ConversationRepository,
     private jobRepository: JobRepository,
+    private bidRepository: BidRepository,
     private gateway: MessagesGateway,
   ) {}
 
@@ -30,9 +33,20 @@ export class MessagesService {
     const isCustomer = job.customerId === userId;
     const isAssignedProvider = job.assignedProviderId === userId;
 
+    // Allow any provider who has placed a non-rejected/non-withdrawn bid to chat
+    // with the customer before the bid is accepted — mirrors Airtasker's pre-assignment
+    // messaging model where negotiation happens before commitment.
+    let isActiveBidder = false;
     if (!isCustomer && !isAssignedProvider) {
+      const existingBid = await this.bidRepository.findByJobAndProvider(jobId, userId);
+      isActiveBidder =
+        existingBid !== null &&
+        [BidStatus.PENDING, BidStatus.ACCEPTED].includes(existingBid.status as BidStatus);
+    }
+
+    if (!isCustomer && !isAssignedProvider && !isActiveBidder) {
       throw new UnauthorizedActionException(
-        'You must be the job owner or assigned provider to start a conversation',
+        'You must be the job owner, assigned provider, or an active bidder to start a conversation',
       );
     }
 
