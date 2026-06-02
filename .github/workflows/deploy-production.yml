@@ -1,4 +1,4 @@
-name: Deploy — production
+name: Deploy - production
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
         required: true
 
 # Production deploys require a human approval.
-# Configure: Settings → Environments → production → Required reviewers → add yourself.
+# Configure: Settings -> Environments -> production -> Required reviewers -> add yourself.
 # The 5-minute wait timer there gives you a window to cancel a mis-click.
 jobs:
   ci:
@@ -25,7 +25,7 @@ jobs:
     environment: production       # PAUSES here until a reviewer approves
     uses: lehaithanh10/cartaskers-infra/.github/workflows/fly-deploy.yml@v1.0.0
     with:
-      # vars.* context is not available in reusable-workflow `with:` blocks —
+      # vars.* context is not available in reusable-workflow `with:` blocks --
       # even with environment: set. Hard-code the non-sensitive values here.
       app-name: cartaskers-be-production
       fly-config: fly.prod.toml
