@@ -91,8 +91,14 @@ export class BidRepository extends BaseRepository<JobBid, CreateJobBidInput, Upd
         },
       });
 
-      const conversation = await tx.conversation.create({
-        data: {
+      // upsert -- a conversation may already exist if either party opened the
+      // chat (POST /conversations) before the bid was accepted. Conversation.jobId
+      // is UNIQUE; create() would throw P2002 on the second path. update:{} is
+      // a no-op when the row already has the right customer/provider pair.
+      const conversation = await tx.conversation.upsert({
+        where: { jobId },
+        update: {},
+        create: {
           jobId,
           customerId,
           providerId,
